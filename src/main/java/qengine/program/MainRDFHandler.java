@@ -29,16 +29,18 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 	}
 	
 	
-	public void displayDictionary() {
-		rdfDictionary.displayDictionary();
+	public String displayDictionary() {
+		return rdfDictionary.displayDictionary();
 	}
 	
 
-	public void displayIndex() {
-		for (String order : new String[]{"SOP", "OPS", "SPO", "OSP", "PSO", "POS"}) {
-			rdfDictionary.displayTripleIndex(order);
-			System.out.println("-------------------");
-		}
+	public String displayIndex() {
+	    StringBuilder result = new StringBuilder();
+	    for (String order : new String[]{"SOP", "OPS", "SPO", "OSP", "PSO", "POS"}) {
+	        result.append(rdfDictionary.displayTripleIndex(order)).append("\n");
+	        result.append("-------------------\n");
+	    }
+	    return result.toString();
 	}
 	
 	

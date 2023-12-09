@@ -56,11 +56,13 @@ final class Main {
 	/**
 	 * Fichier contenant les requêtes sparql
 	 */
+	//static final String queryFile = workingDir + "sample_query.queryset";
 	static String queryFile = "";
 
 	/**
 	 * Fichier contenant des données rdf
 	 */
+	//static final String dataFile = workingDir + "sample_data.nt";
 	static String dataFile = "";
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
@@ -75,34 +77,31 @@ final class Main {
 	/**
 	 * Méthode utilisée ici lors du parsing de requête sparql pour agir sur l'objet obtenu.
 	 */
-	public static void processAQuery(ParsedQuery query) {
+	public static String processAQuery(ParsedQuery query) {
 		List<StatementPattern> patterns = StatementPatternCollector.process(query.getTupleExpr());
 
 	    // Variables pour collecter les informations nécessaires
 	    List<String> listSubjects = new ArrayList<>();
+	    
+	    StringBuilder result = new StringBuilder();
 
 	    for (StatementPattern pattern : patterns) {
 	        String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
-	        System.out.println("Pattern: " + pattern);
-	        System.out.println("Object of the pattern: " + object);
+	        result.append("Pattern: ").append(pattern).append("\n");
+	        result.append("Object of the pattern: ").append(object).append("\n");
 
 	        // Utilisation de l'ordre POS pour rechercher le sujet
 	        String subject = rdfHandler.findSubject(predicate, object);
-	        
 	        listSubjects.add(subject);
-
-	        System.out.println("-------------------");
+	        
+	        result.append("-------------------\n");
 	    }
-	    
-	    // Afficher la liste des sujets
-	    System.out.println("Subject found: " + listSubjects);
+	    result.append("Subject found: ").append(listSubjects).append("\n");
+	    result.append("\n##################################################\n\n");
 
-	    System.out.println();
-	    System.out.println("##################################################");
-	    System.out.println();
-	
+	    return result.toString();
 	}
 	
 	
@@ -143,6 +142,12 @@ final class Main {
             dataFile = dataPath;
             queryFile = queriesPath;
             
+            // Specify the CSV file path
+            String csvFilePath = outputPath + "/output.csv"; 
+            
+            // Create a FileWriter with the specified CSV file path
+            CSVWriter writer = new CSVWriter(new FileWriter(csvFilePath));
+            
            /* if (cmd.hasOption("Jena")) {
                 // Activer la vérification Jena
             	System.out.println("Vérification Jena activée.");
@@ -156,54 +161,35 @@ final class Main {
                 // Considérer une permutation aléatoire des requêtes
             }*/
             
-    		parseData();
-    		parseQueries();
+			List<String> dataResults = parseData();
+		    List<String> queryResults = parseQueries();
+		    for (String s : dataResults) {
+		    	writer.writeNext(new String[]{s});
+		    }
+		    for (String s : queryResults) {
+		    	writer.writeNext(new String[]{s});
+		    }
 
-            // Exportez les résultats dans un fichier CSV
-            // ...
-    		exportToCSV();
+    		// Fermez le writer
+            writer.close();
+            
+            // Print a message indicating successful export
+            System.out.println("Results exported to CSV: " + csvFilePath);
 
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
-            System.err.println("Erreur lors de l'analyse des arguments : " + e.getMessage());
+            System.err.println("Error exporting to CSV: " + e.getMessage());
         }
 
 	}
-		/*
-public void warmUpSystemWithQueries(List<String> queries, double percentage) {
-    // Assurez-vous que warmPercentage est compris entre 0 et 100
-    if (percentage < 0 || percentage > 100) {
-        throw new IllegalArgumentException("Le pourcentage d'échantillon doit être compris entre 0 et 100.");
-    }
-
-    // Calculer le nombre d'échantillons à exécuter
-    int totalQueries = queries.size();
-    int warmUpCount = (int) (totalQueries * (percentage / 100));
-
-    // Créer une liste aléatoire d'indices pour sélectionner les échantillons
-    List<Integer> randomIndices = new ArrayList<>();
-    for (int i = 0; i < totalQueries; i++) {
-        randomIndices.add(i);
-    }
-    Collections.shuffle(randomIndices);
-
-    // Sélectionner les échantillons et les exécuter
-    for (int i = 0; i < warmUpCount; i++) {
-        int index = randomIndices.get(i);
-        String query = queries.get(index);
-
-        // Exécuter la requête SPARQL (à adapter en fonction de votre logique)
-        // ...
-    }
-}*/
 	
 	// ========================================================================
 
 	/**
 	 * Traite chaque requête lue dans {@link #queryFile} avec {@link #processAQuery(ParsedQuery)}.
 	 */
-	private static void parseQueries() throws FileNotFoundException, IOException {
+	private static List<String> parseQueries() throws FileNotFoundException, IOException {
 		/**
 		 * Try-with-resources
 		 * 
@@ -213,6 +199,8 @@ public void warmUpSystemWithQueries(List<String> queries, double percentage) {
 		 * On utilise un stream pour lire les lignes une par une, sans avoir à toutes les stocker
 		 * entièrement dans une collection.
 		 */
+		List<String> resultsParseQueries = new ArrayList<>();
+		
 		try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 			SPARQLParser sparqlParser = new SPARQLParser();
 			Iterator<String> lineIterator = lineStream.iterator();
@@ -230,23 +218,24 @@ public void warmUpSystemWithQueries(List<String> queries, double percentage) {
 				if (line.trim().endsWith("}")) {
 					ParsedQuery query = sparqlParser.parseQuery(queryString.toString(), baseURI);
 
-					processAQuery(query); // Traitement de la requête, à adapter/réécrire pour votre programme
+					//processAQuery(query); // Traitement de la requête, à adapter/réécrire pour votre programme
+					resultsParseQueries.add(processAQuery(query));
 
 					queryString.setLength(0); // Reset le buffer de la requête en chaine vide
 				}
 			}
 		}
+		return resultsParseQueries;
 	}
 
 	/**
 	 * Traite chaque triple lu dans {@link #dataFile} avec {@link MainRDFHandler}.
 	 */
-	private static void parseData() throws FileNotFoundException, IOException {
+	private static List<String> parseData() throws FileNotFoundException, IOException {
+		List<String> resultsParseData = new ArrayList<>();
 
 		try (Reader dataReader = new FileReader(dataFile)) {
 			RDFParser rdfParser = Rio.createParser(RDFFormat.NTRIPLES);
-			// On va parser des données au format ntriples
-			//MainRDFHandler rdfHandler = new MainRDFHandler();
 
 			// Set the RDF handler to the parser
 			rdfParser.setRDFHandler(rdfHandler);
@@ -254,44 +243,10 @@ public void warmUpSystemWithQueries(List<String> queries, double percentage) {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
-			System.out.println();
-			System.out.println("##################################################");
-			// Display the dictionary after processing all statements
-			rdfHandler.displayDictionary();
-			
-			System.out.println();
-			System.out.println("##################################################");
-			// Display the indexes
-			rdfHandler.displayIndex();
+			resultsParseData.add(rdfHandler.displayDictionary());
+			resultsParseData.add(rdfHandler.displayIndex());
 		}
-
+		return resultsParseData;
 	}
-	
-	private static void exportToCSV() {
-        // Create a list to store your data (replace this with your actual data)
-        List<String[]> data = new ArrayList<>();
-        data.add(new String[]{"Column1", "Column2", "Column3"}); 
-
-        // Add your actual data to the list
-        // For example, you might have data from your program that you want to export
-        // data.add(new String[]{"value1", "value2", "value3"});
-
-        // Specify the CSV file path
-        String csvFilePath = outputPath + "/output.csv"; 
-
-        // Create a FileWriter with the specified CSV file path
-        try (CSVWriter writer = new CSVWriter(new FileWriter(csvFilePath))) {
-
-            // Write the data to the CSV file
-            writer.writeAll(data);
-
-            // Print a message indicating successful export
-            System.out.println("Results exported to CSV: " + csvFilePath);
-
-        } catch (IOException e) {
-            // Handle IOException, e.g., by printing an error message
-            System.err.println("Error exporting to CSV: " + e.getMessage());
-        }
-    }
 	
 }

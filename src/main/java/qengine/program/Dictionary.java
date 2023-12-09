@@ -50,6 +50,7 @@ public class Dictionary {
             return id;
         }
     }
+    
 
     private void updateTripleIndex(int subjectId, int predicateId, int objectId) {
         // Update the triple index for different combinations of subject, predicate, and object orders
@@ -61,6 +62,7 @@ public class Dictionary {
         updateIndex(predicateId, objectId, subjectId, "POS");
     }
 
+    
     private void updateIndex(int first, int second, int third, String order) {
         tripleIndex
                 .computeIfAbsent(order, k -> new HashMap<>())
@@ -68,27 +70,35 @@ public class Dictionary {
                 .put(idToElementMap.get(second), third);
     }
 
+    
     //DISPLAY
     
-    public void displayDictionary() {
-        System.out.println("Dictionary Contents:");
+    public String displayDictionary() {
+        StringBuilder result = new StringBuilder();
+        result.append("\n##################################################\n\n");
+        result.append("Dictionary Contents:\n");
+        
         for (Map.Entry<Integer, String> entry : idToElementMap.entrySet()) {
-            System.out.println("ID: " + entry.getKey() + ", Element: " + entry.getValue());
+            result.append("ID: ").append(entry.getKey()).append(", Element: ").append(entry.getValue()).append("\n");
         }
+        return result.toString();
     }
+    
 
-    public void displayTripleIndex(String order) {
-        System.out.println("Triple Index for " + order + ":");
+    public String displayTripleIndex(String order) {
+        StringBuilder result = new StringBuilder();
+        result.append("Triple Index for ").append(order).append(":\n");
+
         if (tripleIndex.containsKey(order)) {
             tripleIndex.get(order).forEach((first, map) ->
                     map.forEach((second, third) ->
-                            System.out.println("(" + elementToIdMap.get(first) + ", " +
-                                    elementToIdMap.get(second) + ", " +
-                                    third + ")"
-                            )
+                            result.append("(").append(elementToIdMap.get(first)).append(", ")
+                                    .append(elementToIdMap.get(second)).append(", ")
+                                    .append(third).append(")\n")
                     )
             );
         }
+        return result.toString();
     }
     
     
@@ -98,21 +108,19 @@ public class Dictionary {
             throw new IllegalArgumentException("Invalid order: " + order);
         }*/
         String result = "";
-        // Get the subject ID from the triple index
+        // Obtenir l'id du sujet depuis l'index
         Map<String, Map<String, Integer>> predicateMap = tripleIndex.get(order);
         if (predicateMap != null) {
             Map<String, Integer> objectMap = predicateMap.get(predicate);
             if (objectMap != null) {
                 Integer subjectId = objectMap.get(object);
                 if (subjectId != null) {
-                    // Return the corresponding element from the idToElementMap
+                    // Retouner le sujet correspondans depuis idToElementMap
                     result =  idToElementMap.get(subjectId);
                 }
                 else result = "le triplet n'existe pas";
             }
         }
-
-        // If no match is found, return null or throw an exceptin based on your use case
         return result;
     }
 
