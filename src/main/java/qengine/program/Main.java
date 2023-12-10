@@ -1,5 +1,6 @@
 package qengine.program;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -20,6 +21,11 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.util.FileManager;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -68,7 +74,13 @@ final class Main {
 	static String dataFile = "";
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
-	
+
+    private static String outputPath = "";
+    private static boolean useJena = true;
+    private static String warmPercentage = "";
+    private static boolean shuffle = true;
+
+
 	// ========================================================================
 
 	/**
@@ -106,22 +118,51 @@ final class Main {
 	 * Entrée du programme
 	 */
 	public static void main(String[] args) throws Exception {
-		
-		// Définir les options de la ligne de commande
-        Options options = new Options();
-        options.addOption("queries", true, "Chemin vers le dossier des requêtes");
-        options.addOption("data", true, "Chemin vers le fichier de données");
-        options.addOption("output", true, "Chemin vers le dossier de sortie");
-        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requçetes");
-        options.addOption("Jena", false, "Active la vérification Jena");
-        options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
-        options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
 
-        CommandLineParser parser = new DefaultParser();
+	    // Définir les options de la ligne de commande
+	    Options options = new Options();
+	    options.addOption("queries", true, "Chemin vers le dossier des requêtes");
+	    options.addOption("data", true, "Chemin vers le fichier de données");
+	    options.addOption("output", true, "Chemin vers le dossier de sortie");
+	    options.addOption("Jena", false, "Active la vérification Jena");
+	    options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
+	    options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
 
-        try {
-            // Analyser les arguments de la ligne de commande
-            CommandLine cmd = parser.parse(options, args);
+	    CommandLineParser parser = new DefaultParser();
+
+	    try {
+	        // Analyser les arguments de la ligne de commande
+	        CommandLine cmd = parser.parse(options, args);
+
+	        // Récupérer les valeurs des options
+	        String queriesPath = cmd.getOptionValue("queries");
+	        String dataPath = cmd.getOptionValue("data");
+	        outputPath = cmd.getOptionValue("output");
+	        useJena = cmd.hasOption("Jena");
+	        warmPercentage = cmd.getOptionValue("warm");
+	        shuffle = cmd.hasOption("shuffle");
+
+	        // Vérifier l'existence des chemins spécifiés
+	        if (queriesPath == null || dataPath == null || outputPath == null) {
+	            System.out.println("Les chemins des requêtes, des données et de la sortie sont obligatoires.");
+	            return;
+	        }
+
+	        dataFile = dataPath;
+	        queryFile = queriesPath;
+
+	        if (useJena) {
+	            // Activer la vérification Jena
+	            System.out.println("Vérification Jena activée.");
+
+	            // Use Jena to read your triple data
+	            Model model = ModelFactory.createDefaultModel();
+	            try (FileInputStream in = new FileInputStream(dataFile)) {
+	                // Assuming your data is in N-TRIPLE format, change if needed
+	                model.read(in, null, "N-TRIPLE");
+	            } catch (Exception e) {
+	                e.printStackTrace();
+	            }
 
             // Récupérer les valeurs des options
             String queriesPath = cmd.getOptionValue("queries");
@@ -173,8 +214,8 @@ final class Main {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
 
-	}
-	
+
+	       
 	// ========================================================================
 
 	/**
