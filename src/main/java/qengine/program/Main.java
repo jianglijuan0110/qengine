@@ -9,8 +9,10 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.apache.commons.cli.CommandLine;
@@ -67,11 +69,6 @@ final class Main {
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
 	
-    private static String outputPath = "";
-    private boolean useJena = true;
-    private String warmPercentage = "";
-    private boolean shuffle = true;
-
 	// ========================================================================
 
 	/**
@@ -81,7 +78,7 @@ final class Main {
 		List<StatementPattern> patterns = StatementPatternCollector.process(query.getTupleExpr());
 
 	    // Variables pour collecter les informations nécessaires
-	    List<String> listSubjects = new ArrayList<>();
+	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait de doublons
 	    
 	    StringBuilder result = new StringBuilder();
 
@@ -93,7 +90,7 @@ final class Main {
 	        result.append("Object of the pattern: ").append(object).append("\n");
 
 	        // Utilisation de l'ordre POS pour rechercher le sujet
-	        String subject = rdfHandler.findSubject(predicate, object);
+	        String subject = rdfHandler.findSubject("POS",predicate, object);
 	        listSubjects.add(subject);
 	        
 	        result.append("-------------------\n");
@@ -115,6 +112,7 @@ final class Main {
         options.addOption("queries", true, "Chemin vers le dossier des requêtes");
         options.addOption("data", true, "Chemin vers le fichier de données");
         options.addOption("output", true, "Chemin vers le dossier de sortie");
+        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requçetes");
         options.addOption("Jena", false, "Active la vérification Jena");
         options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
         options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
@@ -129,12 +127,15 @@ final class Main {
             String queriesPath = cmd.getOptionValue("queries");
             String dataPath = cmd.getOptionValue("data");
             String outputPath = cmd.getOptionValue("output");
+            String exportResultsPath = cmd.getOptionValue("export_query_results");
             boolean useJena = cmd.hasOption("Jena");
-            String warmPercentage = cmd.getOptionValue("warm");
-            boolean shuffle = cmd.hasOption("shuffle");
+            // Récupérer le pourcentage d'échantillon ou utiliser 100 par défaut
+            double warmPercentage = cmd.hasOption("warm") ? Double.parseDouble(cmd.getOptionValue("warm")) : 100.0;
+            // Récupérer l'option shuffle ou utiliser false par défaut
+            boolean shuffle = cmd.hasOption("shuffle") ? true : false;
 
             // Vérifier l'existence des chemins spécifiés
-            if (queriesPath == null || dataPath == null || outputPath == null) {
+            if (queriesPath == null || dataPath == null || exportResultsPath == null) {
                 System.out.println("Les chemins des requêtes, des données et de la sortie sont obligatoires.");
                 return;
             }
@@ -142,44 +143,34 @@ final class Main {
             dataFile = dataPath;
             queryFile = queriesPath;
             
-            // Specify the CSV file path
-            String csvFilePath = outputPath + "/output.csv"; 
+            // Spécifiez le chemin du fichier CSV
+            String csvOutputPath = outputPath + "/output.csv";
+            String csvResultsPath = exportResultsPath + "/results.csv";
             
-            // Create a FileWriter with the specified CSV file path
-            CSVWriter writer = new CSVWriter(new FileWriter(csvFilePath));
-            
-           /* if (cmd.hasOption("Jena")) {
-                // Activer la vérification Jena
-            	System.out.println("Vérification Jena activée.");
-            }*/
-
-            /*if (cmd.hasOption("warm")) {
-                // Utiliser l'échantillon pour chauffer le système
-            }
-
-            if (cmd.hasOption("shuffle")) {
-                // Considérer une permutation aléatoire des requêtes
-            }*/
+            // Créer un FileWriter avec le chemin du fichier CSV spécifié
+            CSVWriter writer = new CSVWriter(new FileWriter(csvResultsPath));
             
 			List<String> dataResults = parseData();
-		    List<String> queryResults = parseQueries();
+		    String queryResults = parseQueries(warmPercentage,shuffle);
 		    for (String s : dataResults) {
 		    	writer.writeNext(new String[]{s});
 		    }
-		    for (String s : queryResults) {
-		    	writer.writeNext(new String[]{s});
-		    }
+		    writer.writeNext(new String[]{queryResults});
 
     		// Fermez le writer
             writer.close();
             
-            // Print a message indicating successful export
-            System.out.println("Results exported to CSV: " + csvFilePath);
-
+            // Afficher un message indiquant une exportation réussie
+            System.out.println("Resultats exportés en CSV: \n" + csvOutputPath + "\n" + csvResultsPath);
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
-            System.err.println("Error exporting to CSV: " + e.getMessage());
+            System.err.println("Erreur lors de l'analyse des auguments: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            // Si la conversion échoue
+            System.err.println("Erreur de conversion : " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
 
 	}
@@ -189,7 +180,7 @@ final class Main {
 	/**
 	 * Traite chaque requête lue dans {@link #queryFile} avec {@link #processAQuery(ParsedQuery)}.
 	 */
-	private static List<String> parseQueries() throws FileNotFoundException, IOException {
+	private static String parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
 		/**
 		 * Try-with-resources
 		 * 
@@ -199,33 +190,60 @@ final class Main {
 		 * On utilise un stream pour lire les lignes une par une, sans avoir à toutes les stocker
 		 * entièrement dans une collection.
 		 */
-		List<String> resultsParseQueries = new ArrayList<>();
+		StringBuilder resultsParseQueries = new StringBuilder();
 		
-		try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
-			SPARQLParser sparqlParser = new SPARQLParser();
-			Iterator<String> lineIterator = lineStream.iterator();
-			StringBuilder queryString = new StringBuilder();
+		// Vérifier que warmPercentage est dans la plage valide
+	    if (percentage <= 0 || percentage > 100) {
+	        resultsParseQueries.append("Le pourcentage doit être compris entre 0 et 100.");
+	    } else {
+	    	// Premier "try" pour compter le nombre de requêtes
+			long queryCount = 0;
+			try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
+		        queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
+		        resultsParseQueries.append("Le nombre total de requêtes est : ").append(queryCount).append("\n");
+		    }
+			
+			// Calculer le nombre d'échantillons à exécuter (partie entiere inf)
+			int warmUpCount = (int) (queryCount * (percentage / 100));
+			resultsParseQueries.append("Le nombre d'échantillons à exécuter est : ").append(warmUpCount).append("\n");
+			
+			// Deuxième "try" pour taiter la requête
+			try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
+				SPARQLParser sparqlParser = new SPARQLParser();
+				Iterator<String> lineIterator = lineStream.iterator();
+				StringBuilder queryString = new StringBuilder();
 
-			while (lineIterator.hasNext())
-			/*
-			 * On stocke plusieurs lignes jusqu'à ce que l'une d'entre elles se termine par un '}'
-			 * On considère alors que c'est la fin d'une requête
-			 */
-			{
-				String line = lineIterator.next();
-				queryString.append(line);
+	            int processedCount = 0; //Compte le nombre de requêtes traitées
+				while (lineIterator.hasNext() && processedCount < warmUpCount)
+				/*
+				 * On stocke plusieurs lignes jusqu'à ce que l'une d'entre elles se termine par un '}'
+				 * On considère alors que c'est la fin d'une requête
+				 */
+				{
+					String line = lineIterator.next();
+					queryString.append(line);
 
-				if (line.trim().endsWith("}")) {
-					ParsedQuery query = sparqlParser.parseQuery(queryString.toString(), baseURI);
-
-					//processAQuery(query); // Traitement de la requête, à adapter/réécrire pour votre programme
-					resultsParseQueries.add(processAQuery(query));
-
-					queryString.setLength(0); // Reset le buffer de la requête en chaine vide
+					if (line.trim().endsWith("}")) {
+	                    ParsedQuery query = sparqlParser.parseQuery(queryString.toString(), baseURI);
+	                    
+	                    // Générer un nombre aléatoire entre 0 et 1
+	                    double randomIndex = Math.random();
+	                    
+	                    // Si shuffle est activé et que le nombre aléatoire est superieur à 0.5
+	                    if (shuffle && randomIndex > 0.5) {
+	                    	resultsParseQueries.append(processAQuery(query)).append("\n");
+	                    	processedCount++;
+	                    } else if(!shuffle) { //Si shuffle est désactivé, traiter les requêtes dans l'ordre
+	                    	resultsParseQueries.append(processAQuery(query)).append("\n");
+	                    	processedCount++;
+	                    }
+	                    queryString.setLength(0); // Reset le buffer de la requête en chaine vide
+	                }
 				}
 			}
-		}
-		return resultsParseQueries;
+	    }
+	    //System.out.println(resultsParseQueries.toString());
+	    return resultsParseQueries.toString();
 	}
 
 	/**
