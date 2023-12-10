@@ -34,7 +34,7 @@ public class Dictionary {
         // Update the triple index
         updateTripleIndex(subjectId, predicateId, objectId);
 
-        System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
+        //System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
     }
 
     //method for adding triplets to the dictionary
@@ -103,10 +103,10 @@ public class Dictionary {
     
     
 	public String findSubject(String order, String predicate, String object) {
-        // Ensure that the order is valid
-        /*if (!order.equals("POS") && !order.equals("OPS")) {
+        // Pour s'assurer de la validite de l'ordre saisie
+        if (!order.equals("POS") && !order.equals("OPS")) {
             throw new IllegalArgumentException("Invalid order: " + order);
-        }*/
+        }
         String result = "";
         // Obtenir l'id du sujet depuis l'index
         Map<String, Map<String, Integer>> predicateMap = tripleIndex.get(order);
@@ -118,7 +118,7 @@ public class Dictionary {
                     // Retouner le sujet correspondans depuis idToElementMap
                     result =  idToElementMap.get(subjectId);
                 }
-                else result = "le triplet n'existe pas";
+                else result = null; //le triplet n'existe pas
             }
         }
         return result;
