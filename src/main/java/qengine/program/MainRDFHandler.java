@@ -44,8 +44,7 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 	}
 	
 	
-	public String findSubject(String predicate, String object){
-		String order = "POS";
+	public String findSubject(String order,String predicate, String object){
 		return  rdfDictionary.findSubject(order, predicate, object);
 	}
 
