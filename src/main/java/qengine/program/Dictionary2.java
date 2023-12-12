@@ -8,35 +8,23 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class Dictionary {
-	
-	//map associant des identifiants uniques à des éléments (String): dictionnaire
-    private Map<Integer, String> idToElementMap;
-    
-    //map avec des clés de type String (représentant l'ordre des éléments dans un triplet)
-    //et des valeurs étant des map imbriquées qui représentent un index de triplets
-    //private Map<String, Map<String, Map<String, Integer>>> tripleIndex;
+public class Dictionary2 {
+	private Map<Integer, String> idToElementMap;
     private Map<String, List<Triple<Integer, Integer, Integer>>> tripleIndex;
-    
     private int currentId;
 
-    public Dictionary() {
+    public Dictionary2() {
         this.idToElementMap = new HashMap<>();
         this.tripleIndex = new HashMap<>();
         this.currentId = 0;
     }
 
-    //méthode pour ajouter les triplets aux index
     public void addTriple(String subject, String predicate, String object) {
-        // Ajoute le sujet, prédicat et objet au dictionnaire et les attribue des identifiants uniques
         int subjectId = addElementToDictionary(subject);
         int predicateId = addElementToDictionary(predicate);
         int objectId = addElementToDictionary(object);
 
-        // Mettre à jour les triple index
         updateTripleIndex(subjectId, predicateId, objectId);
-
-        //System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
     }
 
     private int addElementToDictionary(String element) {
@@ -51,16 +39,11 @@ public class Dictionary {
         idToElementMap.put(this.currentId, element);
         return this.currentId;
     }
-    
+
 
     private void updateTripleIndex(int subjectId, int predicateId, int objectId) {
-        // Mettre à jour les triple index pour différentes combinaisons d'ordres de sujets, de prédicats et d'objets
         updateIndex(subjectId, predicateId, objectId, "SPO");
-        updateIndex(subjectId, objectId, predicateId, "SOP");
-        updateIndex(predicateId, subjectId, objectId, "PSO");
-        updateIndex(objectId, predicateId, subjectId, "OPS");
         updateIndex(predicateId, objectId, subjectId, "POS");
-        updateIndex(objectId, subjectId, predicateId, "OSP");
     }
 
     private void updateIndex(int first, int second, int third, String order) {
@@ -68,67 +51,27 @@ public class Dictionary {
                 .computeIfAbsent(order, k -> new ArrayList<>())
                 .add(new Triple<Integer, Integer, Integer>(first, second, third));
     }
-
     
-    //DISPLAY
-    
-    public String displayDictionary() {
-        StringBuilder result = new StringBuilder();
-        result.append("\n##################################################\n\n");
-        result.append("Dictionary Contents:\n");
-        
+    public void displayElements() {
+        System.out.println("ID to Element Map:");
         for (Map.Entry<Integer, String> entry : idToElementMap.entrySet()) {
-            result.append("ID: ").append(entry.getKey()).append(", Element: ").append(entry.getValue()).append("\n");
+            System.out.println(entry.getKey() + ": " + entry.getValue());
         }
-        return result.toString();
-    }
-    
 
-    public String displayTripleIndex(String order) {
-    	StringBuilder result = new StringBuilder();
-        result.append("Triple Index for ").append(order).append(":\n");
+        System.out.println("\nTriple Index:");
+        for (Map.Entry<String, List<Triple<Integer, Integer, Integer>>> entry : tripleIndex.entrySet()) {
+            String order = entry.getKey();
+            List<Triple<Integer, Integer, Integer>> tripleList = entry.getValue();
 
-        if (tripleIndex.containsKey(order)) {
-            List<Triple<Integer, Integer, Integer>> tripleList = tripleIndex.get(order);
+            System.out.println(order + ":");
 
             for (Triple<Integer, Integer, Integer> triple : tripleList) {
-                result.append("(")
-                      .append(triple.getFirst())
-                      .append(", ")
-                      .append(triple.getSecond())
-                      .append(", ")
-                      .append(triple.getThird())
-                      .append(")\n");
+                System.out.println("(" + triple.getFirst() +
+                                   ", " + triple.getSecond() +
+                                   ", " + triple.getThird() + ")");
             }
-        } else {
-            result.append("No triples found for order: ").append(order);
         }
-
-        return result.toString();    
     }
-    
-    
-    /*public Set<String> findSubjects(String order, String predicate, String object) {
-        // Pour s'assurer de la validité de l'ordre saisi
-        if (!order.equals("POS") && !order.equals("OPS")) {
-            throw new IllegalArgumentException("Order invalide: " + order);
-        }
-        Set<String> results = new HashSet<>();
-        // Obtenir l'id du sujet depuis l'index
-        Map<String, Map<String, Integer>> predicateMap = tripleIndex.get(order);
-        if (predicateMap != null) {
-            Map<String, Integer> objectMap = predicateMap.get(predicate);
-            if (objectMap != null) {
-                Integer subjectId = objectMap.get(object);
-                if (subjectId != null) {
-                    // Retourner le sujet correspondant depuis idToElementMap
-                    results.add(idToElementMap.get(subjectId));
-                }
-                // Sinon, le triplet n'existe pas, ne rien faire
-            }
-        }
-        return results;
-    }*/
     
     public Set<String> findSubjects(String order, String predicate, String object) {
         Set<String> results = new HashSet<>();
@@ -137,6 +80,7 @@ public class Dictionary {
         if (tripleIndex.containsKey(order)) {
             // Récupérer la liste de triplets associée à l'ordre spécifié
             List<Triple<Integer, Integer, Integer>> tripleList = tripleIndex.get(order);
+            
             if(order.equals("POS")) {
             	// Parcourir les triplets
                 for (Triple<Integer, Integer, Integer> triple : tripleList) {
@@ -165,4 +109,19 @@ public class Dictionary {
     }
 
 
+    
+
+    public static void main(String[] args) {
+        Dictionary2 dictionary = new Dictionary2();
+        
+        dictionary.addTriple("http://db.uwaterloo.ca/~galuc/wsdbm/User0", "http://schema.org/birthDate", "1988-09-24");
+        dictionary.addTriple("http://db.uwaterloo.ca/~galuc/wsdbm/User0", "http://db.uwaterloo.ca/~galuc/wsdbm/userId", "9764726");
+        dictionary.addTriple("http://db.uwaterloo.ca/~galuc/wsdbm/User1","http://db.uwaterloo.ca/~galuc/wsdbm/userId", "2536508");
+        dictionary.addTriple("http://db.uwaterloo.ca/~galuc/wsdbm/User2","http://db.uwaterloo.ca/~galuc/wsdbm/userId","5196173");
+		
+		dictionary.displayElements();
+		
+		System.out.println("---------------------------------------");
+		System.out.println(dictionary.findSubjects("POS", "http://db.uwaterloo.ca/~galuc/wsdbm/userId", "5196173"));
+    }
 }
