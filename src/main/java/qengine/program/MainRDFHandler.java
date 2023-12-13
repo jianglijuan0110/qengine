@@ -1,5 +1,7 @@
 package qengine.program;
 
+import java.util.Set;
+
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 
@@ -36,7 +38,7 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 
 	public String displayIndex() {
 	    StringBuilder result = new StringBuilder();
-	    for (String order : new String[]{"SOP", "OPS", "SPO", "OSP", "PSO", "POS"}) {
+	    for (String order : new String[]{"SPO", "SOP", "PSO", "OPS", "POS", "OSP"}) {
 	        result.append(rdfDictionary.displayTripleIndex(order)).append("\n");
 	        result.append("-------------------\n");
 	    }
@@ -44,8 +46,8 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 	}
 	
 	
-	public String findSubject(String order,String predicate, String object){
-		return  rdfDictionary.findSubject(order, predicate, object);
+	public Set<String> findSubjects(String order,String predicate, String object){
+		return  rdfDictionary.findSubjects(order, predicate, object);
 	}
-
+	
 }

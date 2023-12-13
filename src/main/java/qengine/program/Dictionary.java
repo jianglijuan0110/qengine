@@ -1,73 +1,72 @@
 package qengine.program;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public class Dictionary {
 	
-	//map associating unique identifiers to elements (String): dictionary
+	//map associant des identifiants uniques à des éléments (String): dictionnaire
     private Map<Integer, String> idToElementMap;
     
-    //map associating elements (String) with unique identifiers (Integer).
-    private Map<String, Integer> elementToIdMap;
-    
-    //map with keys of type String (representing the order of elements in a triple) 
-    //and values ​​being nested maps that represent an index of triples.
-    private Map<String, Map<String, Map<String, Integer>>> tripleIndex;
+    //map avec des clés de type String (représentant l'ordre des éléments dans un triplet)
+    //et des valeurs étant des map imbriquées qui représentent un index de triplets
+    //private Map<String, Map<String, Map<String, Integer>>> tripleIndex;
+    private Map<String, List<Triple<Integer, Integer, Integer>>> tripleIndex;
     
     private int currentId;
 
     public Dictionary() {
         this.idToElementMap = new HashMap<>();
-        this.elementToIdMap = new HashMap<>();
         this.tripleIndex = new HashMap<>();
-        this.currentId = 1;
+        this.currentId = 0;
     }
 
-    //method for adding triplets to the map indexes
+    //méthode pour ajouter les triplets aux index
     public void addTriple(String subject, String predicate, String object) {
-        // Add subject, predicate, and object to the dictionary and assign unique IDs
+        // Ajoute le sujet, prédicat et objet au dictionnaire et les attribue des identifiants uniques
         int subjectId = addElementToDictionary(subject);
         int predicateId = addElementToDictionary(predicate);
         int objectId = addElementToDictionary(object);
 
-        // Update the triple index
+        // Mettre à jour les triple index
         updateTripleIndex(subjectId, predicateId, objectId);
 
         //System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
     }
 
-    //method for adding triplets to the dictionary
     private int addElementToDictionary(String element) {
-        // Check if the element is already in the dictionary
-        if (elementToIdMap.containsKey(element)) {
-            return elementToIdMap.get(element);
-        } else {
-            // Assign a new ID and add to the dictionaries
-            int id = currentId++;
-            idToElementMap.put(id, element);
-            elementToIdMap.put(element, id);
-            return id;
+        // Vérifie si l'élément existe déjà dans la map
+        for (Map.Entry<Integer, String> entry : idToElementMap.entrySet()) {
+            if (Objects.equals(element, entry.getValue())) {
+                return entry.getKey(); // Retourne la clé associée à l'élément
+            }
         }
+        // Si l'élément n'existe pas, ajoute un nouvel élément avec une nouvelle clé
+        this.currentId++;
+        idToElementMap.put(this.currentId, element);
+        return this.currentId;
     }
     
 
     private void updateTripleIndex(int subjectId, int predicateId, int objectId) {
-        // Update the triple index for different combinations of subject, predicate, and object orders
+        // Mettre à jour les triple index pour différentes combinaisons d'ordres de sujets, de prédicats et d'objets
         updateIndex(subjectId, predicateId, objectId, "SPO");
-        updateIndex(objectId, predicateId, subjectId, "OPS");
         updateIndex(subjectId, objectId, predicateId, "SOP");
-        updateIndex(objectId, subjectId, predicateId, "OSP");
         updateIndex(predicateId, subjectId, objectId, "PSO");
+        updateIndex(objectId, predicateId, subjectId, "OPS");
         updateIndex(predicateId, objectId, subjectId, "POS");
+        updateIndex(objectId, subjectId, predicateId, "OSP");
     }
 
-    
     private void updateIndex(int first, int second, int third, String order) {
         tripleIndex
-                .computeIfAbsent(order, k -> new HashMap<>())
-                .computeIfAbsent(idToElementMap.get(first), k -> new HashMap<>())
-                .put(idToElementMap.get(second), third);
+                .computeIfAbsent(order, k -> new ArrayList<>())
+                .add(new Triple<Integer, Integer, Integer>(first, second, third));
     }
 
     
@@ -86,42 +85,63 @@ public class Dictionary {
     
 
     public String displayTripleIndex(String order) {
-        StringBuilder result = new StringBuilder();
+    	StringBuilder result = new StringBuilder();
         result.append("Triple Index for ").append(order).append(":\n");
 
         if (tripleIndex.containsKey(order)) {
-            tripleIndex.get(order).forEach((first, map) ->
-                    map.forEach((second, third) ->
-                            result.append("(").append(elementToIdMap.get(first)).append(", ")
-                                    .append(elementToIdMap.get(second)).append(", ")
-                                    .append(third).append(")\n")
-                    )
-            );
-        }
-        return result.toString();
-    }
-    
-    
-	public String findSubject(String order, String predicate, String object) {
-        // Pour s'assurer de la validite de l'ordre saisie
-        if (!order.equals("POS") && !order.equals("OPS")) {
-            throw new IllegalArgumentException("Invalid order: " + order);
-        }
-        String result = "";
-        // Obtenir l'id du sujet depuis l'index
-        Map<String, Map<String, Integer>> predicateMap = tripleIndex.get(order);
-        if (predicateMap != null) {
-            Map<String, Integer> objectMap = predicateMap.get(predicate);
-            if (objectMap != null) {
-                Integer subjectId = objectMap.get(object);
-                if (subjectId != null) {
-                    // Retouner le sujet correspondans depuis idToElementMap
-                    result =  idToElementMap.get(subjectId);
-                }
-                else result = null; //le triplet n'existe pas
+            List<Triple<Integer, Integer, Integer>> tripleList = tripleIndex.get(order);
+
+            for (Triple<Integer, Integer, Integer> triple : tripleList) {
+                result.append("(")
+                      .append(triple.getFirst())
+                      .append(", ")
+                      .append(triple.getSecond())
+                      .append(", ")
+                      .append(triple.getThird())
+                      .append(")\n");
             }
+        } else {
+            result.append("No triples found for order: ").append(order);
         }
-        return result;
+
+        return result.toString();    
     }
+    
+    
+    
+    public Set<String> findSubjects(String order, String predicate, String object) {
+        Set<String> results = new HashSet<>();
+
+        // Vérifier si l'ordre spécifié existe dans le tripleIndex
+        if (tripleIndex.containsKey(order)) {
+            // Récupérer la liste de triplets associée à l'ordre spécifié
+            List<Triple<Integer, Integer, Integer>> tripleList = tripleIndex.get(order);
+            if(order.equals("POS")) {
+            	// Parcourir les triplets
+                for (Triple<Integer, Integer, Integer> triple : tripleList) {
+                    // Vérifier si le prédicat et l'objet correspondent aux valeurs spécifiées
+                    if (idToElementMap.get(triple.getFirst()).equals(predicate) &&
+                        idToElementMap.get(triple.getSecond()).equals(object)) {
+                        // Ajouter le sujet correspondant à l'ensemble des résultats
+                        results.add(idToElementMap.get(triple.getThird()));
+                    }
+                }
+        	}
+        	if(order.equals("OPS")) {
+        		// Parcourir les triplets
+                for (Triple<Integer, Integer, Integer> triple : tripleList) {
+                    // Vérifier si le prédicat et l'objet correspondent aux valeurs spécifiées
+                    if (idToElementMap.get(triple.getSecond()).equals(predicate) &&
+                        idToElementMap.get(triple.getFirst()).equals(object)) {
+                        // Ajouter le sujet correspondant à l'ensemble des résultats
+                        results.add(idToElementMap.get(triple.getThird()));
+                    }
+                }
+        	}
+        }
+
+        return results;
+    }
+
 
 }
