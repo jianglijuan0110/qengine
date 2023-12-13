@@ -1,5 +1,6 @@
 package qengine.program;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -20,6 +21,14 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.jena.query.Query;
+import org.apache.jena.query.QueryExecution;
+import org.apache.jena.query.QueryExecutionFactory;
+import org.apache.jena.query.QueryFactory;
+import org.apache.jena.query.QuerySolution;
+import org.apache.jena.query.ResultSet;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -46,6 +55,8 @@ import com.opencsv.CSVWriter;
  * </p>
  * 
  * @author Olivier Rodriguez <olivier.rodriguez1@umontpellier.fr>
+ * Modifié par Maguette Sarr <maguette.sarr@etu.umontpellier.fr>
+ * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
 	static final String baseURI = null;
@@ -74,31 +85,30 @@ final class Main {
 	/**
 	 * Méthode utilisée ici lors du parsing de requête sparql pour agir sur l'objet obtenu.
 	 */
-	public static String processAQuery(ParsedQuery query) {
+	public static Set<String> processAQuery(ParsedQuery query) {
 		List<StatementPattern> patterns = StatementPatternCollector.process(query.getTupleExpr());
 
 	    // Variables pour collecter les informations nécessaires
-	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait de doublons
+	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
 	    
-	    StringBuilder result = new StringBuilder();
-
+	    int i = 0;
 	    for (StatementPattern pattern : patterns) {
-	        String predicate = pattern.getPredicateVar().getValue().stringValue();
+	    	
+	    	String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
-	        result.append("Pattern: ").append(pattern).append("\n");
-	        result.append("Object of the pattern: ").append(object).append("\n");
-
-	        // Utilisation de l'ordre POS pour rechercher le sujet
-	        String subject = rdfHandler.findSubject("POS",predicate, object);
-	        listSubjects.add(subject);
-	        
-	        result.append("-------------------\n");
+	        // Utilisation de l'ordre POS pour rechercher les sujets
+	        Set<String> subjects = rdfHandler.findSubjects("POS",predicate, object);
+	    	
+	    	if(i == 0) { // Si c'est le premier motif
+	    		listSubjects.addAll(subjects);
+	    	}else {
+                // Si ce n'est pas le premier motif, gardez seulement les sujets communs
+                listSubjects.retainAll(subjects);
+	    	}
+	        i++;
 	    }
-	    result.append("Subject found: ").append(listSubjects).append("\n");
-	    result.append("\n##################################################\n\n");
-
-	    return result.toString();
+	    return listSubjects;
 	}
 	
 	
@@ -146,22 +156,54 @@ final class Main {
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
             String csvResultsPath = exportResultsPath + "/results.csv";
+            String csvResultsPath2 = exportResultsPath + "/resultsJena.csv";
             
             // Créer un FileWriter avec le chemin du fichier CSV spécifié
             CSVWriter writer = new CSVWriter(new FileWriter(csvResultsPath));
             
-			List<String> dataResults = parseData();
-		    String queryResults = parseQueries(warmPercentage,shuffle);
-		    for (String s : dataResults) {
-		    	writer.writeNext(new String[]{s});
+			//List<String> dataResults = parseData();
+            parseData();
+            List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
+		    writer.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
+		    
+		    if(useJena) {
+	        	System.out.println("Vérification Jena activée");
+	        	
+		    	List<Set<String>> results = parseQueriesWithJena();
+		    	writer.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
+		    	
+		    	CSVWriter writer2 = new CSVWriter(new FileWriter(csvResultsPath2));
+		    	for (Set<String> s : results) {
+			    	writer2.writeNext(new String[]{s.toString()});
+			    }
+	    		// Fermez le writer
+	            writer2.close();
+	            
+		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
+		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
+		        	System.out.println("Correctude et complétude des résultats du système : " + false);
+		        } else {
+		        	boolean b = true;
+		            // Parcourir les listes et comparer chaque élément
+		            for (int i = 0; i < results.size(); i++) {
+		                if(!queryResults.get(i).equals(results.get(i))) {
+		                	b = false;
+		                	break;
+		                }
+		            }
+		            System.out.println("Correctude et complétude des résultats du système : " + b);
+		        }
 		    }
-		    writer.writeNext(new String[]{queryResults});
+		    
+		    for (Set<String> s : queryResults) {
+		    	writer.writeNext(new String[]{s.toString()});
+		    }
 
     		// Fermez le writer
             writer.close();
             
             // Afficher un message indiquant une exportation réussie
-            System.out.println("Resultats exportés en CSV: \n" + csvOutputPath + "\n" + csvResultsPath);
+            System.out.println("Resultats exportés en CSV: \n" + csvOutputPath + "\n" + csvResultsPath + "\n" + csvResultsPath2);
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
@@ -172,7 +214,7 @@ final class Main {
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
-
+        
 	}
 	
 	// ========================================================================
@@ -180,70 +222,55 @@ final class Main {
 	/**
 	 * Traite chaque requête lue dans {@link #queryFile} avec {@link #processAQuery(ParsedQuery)}.
 	 */
-	private static String parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
-		/**
-		 * Try-with-resources
-		 * 
-		 * @see <a href="https://docs.oracle.com/javase/tutorial/essential/exceptions/tryResourceClose.html">Try-with-resources</a>
-		 */
-		/*
-		 * On utilise un stream pour lire les lignes une par une, sans avoir à toutes les stocker
-		 * entièrement dans une collection.
-		 */
-		StringBuilder resultsParseQueries = new StringBuilder();
-		
-		// Vérifier que warmPercentage est dans la plage valide
+	private static List<Set<String>> parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
+		List<Set<String>> resultsParseQueries = new ArrayList<>();
+
+	    // Vérifier que warmPercentage est dans la plage valide
 	    if (percentage <= 0 || percentage > 100) {
-	        resultsParseQueries.append("Le pourcentage doit être compris entre 0 et 100.");
+	        System.out.println("Le pourcentage doit être compris entre 0 et 100.");
 	    } else {
-	    	// Premier "try" pour compter le nombre de requêtes
-			long queryCount = 0;
-			try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
-		        queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
-		        resultsParseQueries.append("Le nombre total de requêtes est : ").append(queryCount).append("\n");
-		    }
-			
-			// Calculer le nombre d'échantillons à exécuter (partie entiere inf)
-			int warmUpCount = (int) (queryCount * (percentage / 100));
-			resultsParseQueries.append("Le nombre d'échantillons à exécuter est : ").append(warmUpCount).append("\n");
-			
-			// Deuxième "try" pour taiter la requête
-			try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
-				SPARQLParser sparqlParser = new SPARQLParser();
-				Iterator<String> lineIterator = lineStream.iterator();
-				StringBuilder queryString = new StringBuilder();
+	        // Premier "try" pour compter le nombre de requêtes
+	        long queryCount = 0;
+	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
+	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
+	            //resultsParseQueries.add("Le nombre total de requêtes est : " + queryCount);
+	        }
 
-	            int processedCount = 0; //Compte le nombre de requêtes traitées
-				while (lineIterator.hasNext() && processedCount < warmUpCount)
-				/*
-				 * On stocke plusieurs lignes jusqu'à ce que l'une d'entre elles se termine par un '}'
-				 * On considère alors que c'est la fin d'une requête
-				 */
-				{
-					String line = lineIterator.next();
-					queryString.append(line);
+	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
+	        int warmUpCount = (int) (queryCount * (percentage / 100));
+	        //resultsParseQueries.add("Le nombre d'échantillons à exécuter est : " + warmUpCount);
 
-					if (line.trim().endsWith("}")) {
+	        // Deuxième "try" pour traiter la requête
+	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
+	            SPARQLParser sparqlParser = new SPARQLParser();
+	            Iterator<String> lineIterator = lineStream.iterator();
+	            StringBuilder queryString = new StringBuilder();
+
+	            int processedCount = 0; // Compte le nombre de requêtes traitées
+	            while (lineIterator.hasNext() && processedCount < warmUpCount) {
+	                String line = lineIterator.next();
+	                queryString.append(line);
+
+	                if (line.trim().endsWith("}")) {
 	                    ParsedQuery query = sparqlParser.parseQuery(queryString.toString(), baseURI);
-	                    
+
 	                    // Générer un nombre aléatoire entre 0 et 1
 	                    double randomIndex = Math.random();
-	                    
-	                    // Si shuffle est activé et que le nombre aléatoire est superieur à 0.5
+
+	                    // Si shuffle est activé et que le nombre aléatoire est supérieur à 0.5
 	                    if (shuffle && randomIndex > 0.5) {
-	                    	resultsParseQueries.append(processAQuery(query)).append("\n");
-	                    	processedCount++;
-	                    } else if(!shuffle) { //Si shuffle est désactivé, traiter les requêtes dans l'ordre
-	                    	resultsParseQueries.append(processAQuery(query)).append("\n");
-	                    	processedCount++;
+	                        resultsParseQueries.add(processAQuery(query));
+	                        processedCount++;
+	                    } else if (!shuffle) { // Si shuffle est désactivé, traiter les requêtes dans l'ordre
+	                        resultsParseQueries.add(processAQuery(query));
+	                        processedCount++;
 	                    }
 	                    queryString.setLength(0); // Reset le buffer de la requête en chaine vide
 	                }
-				}
-			}
+	            }
+	        }
 	    }
-	    //System.out.println(resultsParseQueries.toString());
-	    return resultsParseQueries.toString();
+	    return resultsParseQueries;
 	}
 
 	/**
@@ -266,5 +293,74 @@ final class Main {
 		}
 		return resultsParseData;
 	}
+	
+	/**
+	 * Vérification Jena
+	 */
+	public static List<Set<String>> parseQueriesWithJena() throws FileNotFoundException, IOException {
+        // Chargement des données RDF avec Jena
+        Model model = ModelFactory.createDefaultModel();
+        try (FileInputStream in = new FileInputStream(dataFile)) {
+            model.read(in, null, "TURTLE");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println("Nombre de triplets dans le modèle : " + model.size());
+
+        List<Set<String>> resultList = new ArrayList<>();
+        StringBuilder queryString = new StringBuilder();
+
+        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
+            Iterator<String> lineIterator = lineStream.iterator();
+
+            while (lineIterator.hasNext()) {
+                String line = lineIterator.next();
+                queryString.append(line);
+
+                if (line.trim().endsWith("}")) {
+                    // Création de la requête SPARQL
+                    String sparqlQuery = queryString.toString();
+
+                    try {
+                        // Création de l'objet Query à partir de la chaîne SPARQL
+                        Query query = QueryFactory.create(sparqlQuery);
+
+                        // Création et exécution de la requête SPARQL avec Jena
+                        try (QueryExecution qexec = QueryExecutionFactory.create(query, model)) {
+                            ResultSet results = qexec.execSelect();
+
+                            // Liste pour stocker les résultats de la requête courante
+                            Set<String> queryResultList = new HashSet<>();
+
+                            // Afficher les résultats
+                            while (results.hasNext()) {
+                                QuerySolution soln = results.next();
+                                // Récupération des valeurs pour la variable v0
+                                String subject = soln.get("v0").toString();
+                                // Ajouter la solution à la liste de résultats de la requête courante
+                                queryResultList.add(subject);
+                            }
+
+                            // Ajouter la liste de résultats de la requête courante à la liste résultante
+                            resultList.add(queryResultList);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        // Gérer les erreurs liées à la création ou l'exécution de la requête SPARQL
+                        // Ajouter une liste vide à la liste résultante en cas de resultat vide
+                        resultList.add(new HashSet<>());
+                    }
+
+                    // Réinitialiser le buffer de la requête en chaine vide pour la prochaine requête
+                    queryString.setLength(0);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Gérer les erreurs liées à la lecture du fichier de requêtes
+        }
+
+        return resultList;
+    }
 	
 }
