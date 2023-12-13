@@ -29,7 +29,6 @@ import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.RDFNode;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -56,6 +55,8 @@ import com.opencsv.CSVWriter;
  * </p>
  * 
  * @author Olivier Rodriguez <olivier.rodriguez1@umontpellier.fr>
+ * Modifié par Maguette Sarr <maguette.sarr@etu.umontpellier.fr>
+ * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
 	static final String baseURI = null;
@@ -90,20 +91,22 @@ final class Main {
 	    // Variables pour collecter les informations nécessaires
 	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
 	    
+	    int i = 0;
 	    for (StatementPattern pattern : patterns) {
-	        String predicate = pattern.getPredicateVar().getValue().stringValue();
+	    	
+	    	String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
-	        // Utilisation de l'ordre POS pour rechercher le sujet
+	        // Utilisation de l'ordre POS pour rechercher les sujets
 	        Set<String> subjects = rdfHandler.findSubjects("POS",predicate, object);
-	        
-	        // Si c'est le premier motif, ajoutez directement à la liste
-            if (listSubjects.isEmpty()) {
-                listSubjects.addAll(subjects);
-            } else {
+	    	
+	    	if(i == 0) { // Si c'est le premier motif
+	    		listSubjects.addAll(subjects);
+	    	}else {
                 // Si ce n'est pas le premier motif, gardez seulement les sujets communs
                 listSubjects.retainAll(subjects);
-            }
+	    	}
+	        i++;
 	    }
 	    return listSubjects;
 	}
@@ -192,9 +195,6 @@ final class Main {
 		        }
 		    }
 		    
-		    /*for (String s : dataResults) {
-		    	writer.writeNext(new String[]{s});
-		    }*/
 		    for (Set<String> s : queryResults) {
 		    	writer.writeNext(new String[]{s.toString()});
 		    }
@@ -214,34 +214,6 @@ final class Main {
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
-		
-		/*System.out.println(parseData());
-		
-		List<Set<String>> resultsPar = parseQueries(100,false);
-        System.out.println("Résultats obtenus avec le système : \n" + resultsPar);
-        System.out.println(resultsPar.size());
-		
-        System.out.println("-------------------------------------------");
-        
-		List<Set<String>> results = parseQueriesWithJena();
-        System.out.println("Résultats obtenus avec Jena : \n" + results);
-        System.out.println(results.size());
-        
-        // Vérifier si les deux listes sont nulles ou ont une taille différente
-        if (results == null || resultsPar == null || results.size() != resultsPar.size()) {
-        	System.out.println("Vérification Jena: incorrecte");
-        } else {
-        	boolean b = true;
-            //int i = 0;
-            // Parcourir les listes et comparer chaque élément
-            for (int i = 0; i < results.size(); i++) {
-                if(!resultsPar.get(i).equals(results.get(i))) {
-                	b = false;
-                	break;
-                }
-            }
-            System.out.println("Correctude et complétude des résultats du système : " + b);
-        }*/
         
 	}
 	
