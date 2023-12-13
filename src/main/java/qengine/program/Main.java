@@ -68,14 +68,14 @@ final class Main {
 	/**
 	 * Fichier contenant les requêtes sparql
 	 */
-	static final String queryFile = workingDir + "sample_query.queryset";
-	//static String queryFile = "";
+	//static final String queryFile = workingDir + "sample_query.queryset";
+	static String queryFile = "";
 
 	/**
 	 * Fichier contenant des données rdf
 	 */
-	static final String dataFile = workingDir + "sample_data.nt";
-	//static String dataFile = "";
+	//static final String dataFile = workingDir + "sample_data.nt";
+	static String dataFile = "";
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
 	
@@ -88,15 +88,14 @@ final class Main {
 		List<StatementPattern> patterns = StatementPatternCollector.process(query.getTupleExpr());
 
 	    // Variables pour collecter les informations nécessaires
-	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait de doublons
-
+	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
+	    
 	    for (StatementPattern pattern : patterns) {
 	        String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
 	        // Utilisation de l'ordre POS pour rechercher le sujet
 	        Set<String> subjects = rdfHandler.findSubjects("POS",predicate, object);
-	        listSubjects.addAll(subjects);
 	        
 	        // Si c'est le premier motif, ajoutez directement à la liste
             if (listSubjects.isEmpty()) {
@@ -116,7 +115,7 @@ final class Main {
 	public static void main(String[] args) throws Exception {
 		
 		// Définir les options de la ligne de commande
-        /*Options options = new Options();
+        Options options = new Options();
         options.addOption("queries", true, "Chemin vers le dossier des requêtes");
         options.addOption("data", true, "Chemin vers le fichier de données");
         options.addOption("output", true, "Chemin vers le dossier de sortie");
@@ -161,15 +160,17 @@ final class Main {
             
 			//List<String> dataResults = parseData();
             parseData();
-		    List<String> queryResults = parseQueries(warmPercentage,shuffle);
+            List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
 		    writer.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
 		    
 		    if(useJena) {
-		    	List<List<String>> results = parseQueriesWithJena();
+	        	System.out.println("Vérification Jena activée");
+	        	
+		    	List<Set<String>> results = parseQueriesWithJena();
 		    	writer.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
 		    	
 		    	CSVWriter writer2 = new CSVWriter(new FileWriter(csvResultsPath2));
-		    	for (List<String> s : results) {
+		    	for (Set<String> s : results) {
 			    	writer2.writeNext(new String[]{s.toString()});
 			    }
 	    		// Fermez le writer
@@ -177,25 +178,25 @@ final class Main {
 	            
 		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
 		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
-		        	System.out.println("Vérification Jena: incorrecte");
+		        	System.out.println("Correctude et complétude des résultats du système : " + false);
 		        } else {
 		        	boolean b = true;
 		            // Parcourir les listes et comparer chaque élément
 		            for (int i = 0; i < results.size(); i++) {
-		                if(!queryResults.get(i).equals(results.get(i).toString())) {
+		                if(!queryResults.get(i).equals(results.get(i))) {
 		                	b = false;
 		                	break;
 		                }
 		            }
-		            System.out.println("Les résultats du système sont-ils corrects et complets? " + b);
+		            System.out.println("Correctude et complétude des résultats du système : " + b);
 		        }
 		    }
 		    
 		    /*for (String s : dataResults) {
 		    	writer.writeNext(new String[]{s});
 		    }*/
-		   /* for (String s : queryResults) {
-		    	writer.writeNext(new String[]{s});
+		    for (Set<String> s : queryResults) {
+		    	writer.writeNext(new String[]{s.toString()});
 		    }
 
     		// Fermez le writer
@@ -212,17 +213,17 @@ final class Main {
             System.err.println("Erreur de conversion : " + e.getMessage());
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
-        }*/
+        }
 		
-		System.out.println(parseData());
+		/*System.out.println(parseData());
 		
-		List<String> resultsPar = parseQueries(100,false);
+		List<Set<String>> resultsPar = parseQueries(100,false);
         System.out.println("Résultats obtenus avec le système : \n" + resultsPar);
         System.out.println(resultsPar.size());
 		
         System.out.println("-------------------------------------------");
         
-		List<List<String>> results = parseQueriesWithJena();
+		List<Set<String>> results = parseQueriesWithJena();
         System.out.println("Résultats obtenus avec Jena : \n" + results);
         System.out.println(results.size());
         
@@ -234,13 +235,13 @@ final class Main {
             //int i = 0;
             // Parcourir les listes et comparer chaque élément
             for (int i = 0; i < results.size(); i++) {
-                if(!resultsPar.get(i).equals(results.get(i).toString())) {
+                if(!resultsPar.get(i).equals(results.get(i))) {
                 	b = false;
                 	break;
                 }
             }
-            System.out.println("Les résultats du système sont-ils corrects et complets? " + b);
-        }
+            System.out.println("Correctude et complétude des résultats du système : " + b);
+        }*/
         
 	}
 	
@@ -249,12 +250,12 @@ final class Main {
 	/**
 	 * Traite chaque requête lue dans {@link #queryFile} avec {@link #processAQuery(ParsedQuery)}.
 	 */
-	private static List<String> parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
-	    List<String> resultsParseQueries = new ArrayList<>();
+	private static List<Set<String>> parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
+		List<Set<String>> resultsParseQueries = new ArrayList<>();
 
 	    // Vérifier que warmPercentage est dans la plage valide
 	    if (percentage <= 0 || percentage > 100) {
-	        resultsParseQueries.add("Le pourcentage doit être compris entre 0 et 100.");
+	        System.out.println("Le pourcentage doit être compris entre 0 et 100.");
 	    } else {
 	        // Premier "try" pour compter le nombre de requêtes
 	        long queryCount = 0;
@@ -286,10 +287,10 @@ final class Main {
 
 	                    // Si shuffle est activé et que le nombre aléatoire est supérieur à 0.5
 	                    if (shuffle && randomIndex > 0.5) {
-	                        resultsParseQueries.add(processAQuery(query).toString());
+	                        resultsParseQueries.add(processAQuery(query));
 	                        processedCount++;
 	                    } else if (!shuffle) { // Si shuffle est désactivé, traiter les requêtes dans l'ordre
-	                        resultsParseQueries.add(processAQuery(query).toString());
+	                        resultsParseQueries.add(processAQuery(query));
 	                        processedCount++;
 	                    }
 	                    queryString.setLength(0); // Reset le buffer de la requête en chaine vide
@@ -324,7 +325,7 @@ final class Main {
 	/**
 	 * Vérification Jena
 	 */
-	public static List<List<String>> parseQueriesWithJena() throws FileNotFoundException, IOException {
+	public static List<Set<String>> parseQueriesWithJena() throws FileNotFoundException, IOException {
         // Chargement des données RDF avec Jena
         Model model = ModelFactory.createDefaultModel();
         try (FileInputStream in = new FileInputStream(dataFile)) {
@@ -334,7 +335,7 @@ final class Main {
         }
         System.out.println("Nombre de triplets dans le modèle : " + model.size());
 
-        List<List<String>> resultList = new ArrayList<>();
+        List<Set<String>> resultList = new ArrayList<>();
         StringBuilder queryString = new StringBuilder();
 
         try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
@@ -357,7 +358,7 @@ final class Main {
                             ResultSet results = qexec.execSelect();
 
                             // Liste pour stocker les résultats de la requête courante
-                            List<String> queryResultList = new ArrayList<>();
+                            Set<String> queryResultList = new HashSet<>();
 
                             // Afficher les résultats
                             while (results.hasNext()) {
@@ -374,8 +375,8 @@ final class Main {
                     } catch (Exception e) {
                         e.printStackTrace();
                         // Gérer les erreurs liées à la création ou l'exécution de la requête SPARQL
-                        // Ajouter une liste vide à la liste résultante en cas d'erreur
-                        resultList.add(new ArrayList<>());
+                        // Ajouter une liste vide à la liste résultante en cas de resultat vide
+                        resultList.add(new HashSet<>());
                     }
 
                     // Réinitialiser le buffer de la requête en chaine vide pour la prochaine requête
