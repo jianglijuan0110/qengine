@@ -107,8 +107,7 @@ public class Dictionary {
         return result.toString();    
     }
     
-    
-    
+
     public Set<String> findSubjects(String order, String predicate, String object) {
         Set<String> results = new HashSet<>();
 

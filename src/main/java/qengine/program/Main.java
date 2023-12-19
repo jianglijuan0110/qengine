@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,8 +31,6 @@ import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.RDFNode;
-
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -58,6 +57,8 @@ import com.opencsv.CSVWriter;
  * </p>
  * 
  * @author Olivier Rodriguez <olivier.rodriguez1@umontpellier.fr>
+ * Modifié par Maguette Sarr <maguette.sarr@etu.umontpellier.fr>
+ * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
 	static final String baseURI = null;
@@ -93,20 +94,22 @@ final class Main {
 	    // Variables pour collecter les informations nécessaires
 	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
 	    
+	    int i = 0;
 	    for (StatementPattern pattern : patterns) {
-	        String predicate = pattern.getPredicateVar().getValue().stringValue();
+	    	
+	    	String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
-	        // Utilisation de l'ordre POS pour rechercher le sujet
+	        // Utilisation de l'ordre POS pour rechercher les sujets
 	        Set<String> subjects = rdfHandler.findSubjects("POS",predicate, object);
-	        
-	        // Si c'est le premier motif, ajoutez directement à la liste
-            if (listSubjects.isEmpty()) {
-                listSubjects.addAll(subjects);
-            } else {
+	    	
+	    	if(i == 0) { // Si c'est le premier motif
+	    		listSubjects.addAll(subjects);
+	    	}else {
                 // Si ce n'est pas le premier motif, gardez seulement les sujets communs
                 listSubjects.retainAll(subjects);
-            }
+	    	}
+	        i++;
 	    }
 	    return listSubjects;
 	}
@@ -145,10 +148,16 @@ final class Main {
             boolean shuffle = cmd.hasOption("shuffle") ? true : false;
 
             // Vérifier l'existence des chemins spécifiés
-            if (queriesPath == null || dataPath == null || exportResultsPath == null) {
+            if (queriesPath == null || dataPath == null || outputPath == null) {
                 System.out.println("Les chemins des requêtes, des données et de la sortie sont obligatoires.");
                 return;
             }
+            
+            // Utiliser la classe Path pour extraire les noms des fichiers
+            Path queriesPathObject = Paths.get(queriesPath);
+            String queriesFileName = queriesPathObject.getFileName().toString();
+            Path dataPathObject = Paths.get(dataPath);
+            String dataFileName = dataPathObject.getFileName().toString();
             
             dataFile = dataPath;
             queryFile = queriesPath;
@@ -156,28 +165,41 @@ final class Main {
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
             String csvResultsPath = exportResultsPath + "/results.csv";
-            String csvResultsPath2 = exportResultsPath + "/resultsJena.csv";
+            String csvJenaPath = outputPath + "/resultsJena.csv";
             
             // Créer un FileWriter avec le chemin du fichier CSV spécifié
-            CSVWriter writer = new CSVWriter(new FileWriter(csvResultsPath));
+            CSVWriter writerOutput = new CSVWriter(new FileWriter(csvOutputPath));
+            writerOutput.writeNext(new String[]{"Nom du fichier de données : " + dataFileName});
+            writerOutput.writeNext(new String[]{"Nom du fichier des requêtes : " + queriesFileName});
             
-			//List<String> dataResults = parseData();
             parseData();
             List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
-		    writer.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
+            
+            if(exportResultsPath != null) {
+                CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
+                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
+                for (Set<String> s : queryResults) {
+    		    	writerResults.writeNext(new String[]{s.toString()});
+    		    }
+        		// Fermez le writer des résultats
+                writerResults.close();
+                System.out.println("Resultats du système exportés en CSV: " + csvResultsPath);
+            }	    
 		    
 		    if(useJena) {
 	        	System.out.println("Vérification Jena activée");
 	        	
 		    	List<Set<String>> results = parseQueriesWithJena();
-		    	writer.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
 		    	
-		    	CSVWriter writer2 = new CSVWriter(new FileWriter(csvResultsPath2));
+		    	CSVWriter writerJena = new CSVWriter(new FileWriter(csvJenaPath));
+		    	writerJena.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
+		    	
 		    	for (Set<String> s : results) {
-			    	writer2.writeNext(new String[]{s.toString()});
+			    	writerJena.writeNext(new String[]{s.toString()});
 			    }
 	    		// Fermez le writer
-	            writer2.close();
+	            writerJena.close();
+	            System.out.println("Resultats Jena exportés en CSV: " + csvJenaPath);
 	            
 		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
 		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
@@ -195,15 +217,13 @@ final class Main {
 		        }
 		    }
 		    
-		    for (Set<String> s : queryResults) {
-		    	writer.writeNext(new String[]{s.toString()});
-		    }
 
-    		// Fermez le writer
-            writer.close();
+		    // Fermez le writer de l'output
+            writerOutput.close();
+
             
             // Afficher un message indiquant une exportation réussie
-            System.out.println("Resultats exportés en CSV: \n" + csvOutputPath + "\n" + csvResultsPath + "\n" + csvResultsPath2);
+            System.out.println("Resultats exportés en CSV: " + csvOutputPath);
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
@@ -214,11 +234,11 @@ final class Main {
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
+
 }
 
 
 	       
-
 	// ========================================================================
 
 	/**
