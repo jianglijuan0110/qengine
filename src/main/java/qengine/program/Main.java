@@ -22,6 +22,7 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
@@ -60,6 +61,14 @@ import com.opencsv.CSVWriter;
  * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
+	static long timeCurrent = 0;
+	static long timeDic = 0;
+	static long timeIndex = 0;
+	static long timeReadData = 0;
+	static long timeReadReq = 0;
+	static long timeTotalEva = 0;
+	static long timeDebAFin = 0;
+	
 	static final String baseURI = null;
 
 	/**
@@ -80,7 +89,8 @@ final class Main {
 	static String dataFile = "";
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
-	
+
+
 	// ========================================================================
 
 	/**
@@ -117,24 +127,24 @@ final class Main {
 	 * Entrée du programme
 	 */
 	public static void main(String[] args) throws Exception {
-		
-		// Définir les options de la ligne de commande
-        Options options = new Options();
-        options.addOption("queries", true, "Chemin vers le dossier des requêtes");
-        options.addOption("data", true, "Chemin vers le fichier de données");
-        options.addOption("output", true, "Chemin vers le dossier de sortie");
-        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requçetes");
-        options.addOption("Jena", false, "Active la vérification Jena");
-        options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
-        options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
 
-        CommandLineParser parser = new DefaultParser();
+	    // Définir les options de la ligne de commande
+	    Options options = new Options();
+	    options.addOption("queries", true, "Chemin vers le dossier des requêtes");
+	    options.addOption("data", true, "Chemin vers le fichier de données");
+	    options.addOption("output", true, "Chemin vers le dossier de sortie");
+	    options.addOption("Jena", false, "Active la vérification Jena");
+	    options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
+	    options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
 
-        try {
-            // Analyser les arguments de la ligne de commande
-            CommandLine cmd = parser.parse(options, args);
+	    CommandLineParser parser = new DefaultParser();
 
-            // Récupérer les valeurs des options
+	    try {
+	        // Analyser les arguments de la ligne de commande
+	        CommandLine cmd = parser.parse(options, args);
+
+	 
+           // Récupérer les valeurs des options
             String queriesPath = cmd.getOptionValue("queries");
             String dataPath = cmd.getOptionValue("data");
             String outputPath = cmd.getOptionValue("output");
@@ -157,8 +167,8 @@ final class Main {
             Path dataPathObject = Paths.get(dataPath);
             String dataFileName = dataPathObject.getFileName().toString();
             
-            dataFile = dataPath;
-            queryFile = queriesPath;
+	        dataFile = workingDir+""+dataPath;
+	        queryFile = workingDir+""+queriesPath;
             
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
@@ -215,8 +225,10 @@ final class Main {
 		        }
 		    }
 		    
+
 		    // Fermez le writer de l'output
             writerOutput.close();
+
             
             // Afficher un message indiquant une exportation réussie
             System.out.println("Resultats exportés en CSV: " + csvOutputPath);
@@ -230,9 +242,11 @@ final class Main {
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
-        
-	}
-	
+
+}
+
+
+	       
 	// ========================================================================
 
 	/**
@@ -304,8 +318,19 @@ final class Main {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
+			System.out.println("temps pour lire dictionaire "+ timeDic);
+			
+			timeCurrent = System.currentTimeMillis();
+			
 			resultsParseData.add(rdfHandler.displayDictionary());
+			
+			timeDic  = System.currentTimeMillis() - timeCurrent;
+			
+			System.out.println("temps pour lire index "+timeIndex);
+			
+			timeCurrent = System.currentTimeMillis();
 			resultsParseData.add(rdfHandler.displayIndex());
+			timeIndex = System.currentTimeMillis() - timeCurrent;
 		}
 		return resultsParseData;
 	}
