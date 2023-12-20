@@ -133,6 +133,7 @@ final class Main {
 	    options.addOption("queries", true, "Chemin vers le dossier des requêtes");
 	    options.addOption("data", true, "Chemin vers le fichier de données");
 	    options.addOption("output", true, "Chemin vers le dossier de sortie");
+	    options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats de requêttes");
 	    options.addOption("Jena", false, "Active la vérification Jena");
 	    options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
 	    options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
