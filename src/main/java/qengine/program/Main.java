@@ -134,7 +134,7 @@ final class Main {
         options.addOption("Jena", false, "Active la vérification Jena");
         options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
         options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
-        
+
 	    CommandLineParser parser = new DefaultParser();
 
 	    try {
