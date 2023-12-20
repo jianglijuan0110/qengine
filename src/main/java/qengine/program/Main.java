@@ -61,6 +61,14 @@ import com.opencsv.CSVWriter;
  * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
+	static long timeCurrent = 0;
+	static long timeDic = 0;
+	static long timeIndex = 0;
+	static long timeReadData = 0;
+	static long timeReadReq = 0;
+	static long timeTotalEva = 0;
+	static long timeDebAFin = 0;
+	
 	static final String baseURI = null;
 
 	/**
@@ -159,8 +167,8 @@ final class Main {
             Path dataPathObject = Paths.get(dataPath);
             String dataFileName = dataPathObject.getFileName().toString();
             
-            dataFile = dataPath;
-            queryFile = queriesPath;
+	        dataFile = workingDir+""+dataPath;
+	        queryFile = workingDir+""+queriesPath;
             
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
@@ -310,8 +318,19 @@ final class Main {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
+			System.out.println("temps pour lire dictionaire "+ timeDic);
+			
+			timeCurrent = System.currentTimeMillis();
+			
 			resultsParseData.add(rdfHandler.displayDictionary());
+			
+			timeDic  = System.currentTimeMillis() - timeCurrent;
+			
+			System.out.println("temps pour lire index "+timeIndex);
+			
+			timeCurrent = System.currentTimeMillis();
 			resultsParseData.add(rdfHandler.displayIndex());
+			timeIndex = System.currentTimeMillis() - timeCurrent;
 		}
 		return resultsParseData;
 	}
