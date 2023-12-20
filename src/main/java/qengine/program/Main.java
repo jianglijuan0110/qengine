@@ -84,10 +84,12 @@ final class Main {
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
 
 	static long timeCurrent;
+	static long timeCurrent0;
     static long timeReadData;
-    static long timeReadReq;
+    static long timeEvalReq;
     static long timeTotalEva;
     static long timeDebAFinProg;
+    static long timeReadReq;
 	// ========================================================================
 
 	/**
@@ -124,6 +126,8 @@ final class Main {
 	 * Entrée du programme
 	 */
 	public static void main(String[] args) throws Exception {
+		
+		timeCurrent0 = System.currentTimeMillis();
 		
 		// Définir les options de la ligne de commande
         Options options = new Options();
@@ -186,6 +190,7 @@ final class Main {
             writerOutput.writeNext(new String[]{"Nombre de tripets RDF : " + parseResults.get(0)});
             writerOutput.writeNext(new String[]{queryResults.get(0).toString()});
             writerOutput.writeNext(new String[]{parseResults.get(parseResults.size()-1)});
+            writerOutput.writeNext(new String[]{queryResults.get(1).toString()});
             writerOutput.writeNext(new String[]{queryResults.get(queryResults.size()-1).toString()});
             writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(1) + " ms"});
             writerOutput.writeNext(new String[]{"Nombre d'indexes : " + parseResults.get(2)});
@@ -193,10 +198,10 @@ final class Main {
             
             if(exportResultsPath != null) {
                 CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
-                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
-                for (Set<String> s : queryResults) {
-    		    	writerResults.writeNext(new String[]{s.toString()});
-    		    }
+                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size()-3)});
+                for (int i=2; i < queryResults.size()-1; i++) {
+                	writerResults.writeNext(new String[]{queryResults.get(i).toString()});
+                }
         		// Fermez le writer des résultats
                 writerResults.close();
                 System.out.println("Resultats du système exportés en CSV: " + csvResultsPath);
@@ -218,13 +223,13 @@ final class Main {
 	            System.out.println("Resultats Jena exportés en CSV: " + csvJenaPath);
 	            
 		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
-		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
+		        if (results == null || queryResults == null || results.size() != queryResults.size()-3) {
 		        	System.out.println("Correctude et complétude des résultats du système : " + false);
 		        } else {
 		        	boolean b = true;
 		            // Parcourir les listes et comparer chaque élément
 		            for (int i = 0; i < results.size(); i++) {
-		                if(!queryResults.get(i).equals(results.get(i))) {
+		                if(!queryResults.get(i+2).equals(results.get(i)) && i+2 < queryResults.size()) {
 		                	b = false;
 		                	break;
 		                }
@@ -234,6 +239,9 @@ final class Main {
 		    }
 		    
 
+		    timeDebAFinProg  = System.currentTimeMillis() - timeCurrent0;
+		    writerOutput.writeNext(new String[]{"Temps total du début à la fin du programme : " + timeDebAFinProg + " ms"});
+		    
 		    // Fermez le writer de l'output
             writerOutput.close();
 
@@ -269,12 +277,19 @@ final class Main {
 	    } else {
 	        // Premier "try" pour compter le nombre de requêtes
 	        long queryCount = 0;
+	        
+	        timeCurrent = System.currentTimeMillis();
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
 	            Set<String> querySet = new HashSet<>();
 	            querySet.add("Nombre de requêtes SPARQL : " + queryCount);
 	            resultsParseQueries.add(querySet);
 	        }
+	        timeReadReq  = System.currentTimeMillis() - timeCurrent;
+	        Set<String> readReqTime = new HashSet<>();
+	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
+	        resultsParseQueries.add(readReqTime);
+	        
 
 	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
 	        int warmUpCount = (int) (queryCount * (percentage / 100));
@@ -310,9 +325,9 @@ final class Main {
 	                }
 	            }
 	        }
-	        timeReadReq  = System.currentTimeMillis() - timeCurrent;
+	        timeEvalReq  = System.currentTimeMillis() - timeCurrent;
 	        Set<String> queryTime = new HashSet<>();
-	        queryTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
+	        queryTime.add("Temps d'évalution des requêtes : " + timeEvalReq + " ms");
 	        resultsParseQueries.add(queryTime);
 	    }
 	    return resultsParseQueries;
@@ -360,7 +375,7 @@ final class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println("Nombre de triplets dans le modèle : " + model.size());
+        //System.out.println("Nombre de triplets dans le modèle : " + model.size());
 
         List<Set<String>> resultList = new ArrayList<>();
         StringBuilder queryString = new StringBuilder();
