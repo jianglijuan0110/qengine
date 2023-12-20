@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.Reader;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,7 +30,6 @@ import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.RDFNode;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.helpers.StatementPatternCollector;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -56,6 +56,8 @@ import com.opencsv.CSVWriter;
  * </p>
  * 
  * @author Olivier Rodriguez <olivier.rodriguez1@umontpellier.fr>
+ * Modifié par Maguette Sarr <maguette.sarr@etu.umontpellier.fr>
+ * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
 	static final String baseURI = null;
@@ -69,15 +71,21 @@ final class Main {
 	 * Fichier contenant les requêtes sparql
 	 */
 	//static final String queryFile = workingDir + "sample_query.queryset";
-	static String queryFile = "";
+	static String queryFile = workingDir;
 
 	/**
 	 * Fichier contenant des données rdf
 	 */
 	//static final String dataFile = workingDir + "sample_data.nt";
-	static String dataFile = "";
+	static String dataFile = workingDir;
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
+	
+	static long timeCurrent;
+    static long timeReadData;
+    static long timeReadReq;
+    static long timeTotalEva;
+    static long timeDebAFinProg;
 	
 	// ========================================================================
 
@@ -90,20 +98,22 @@ final class Main {
 	    // Variables pour collecter les informations nécessaires
 	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
 	    
+	    int i = 0;
 	    for (StatementPattern pattern : patterns) {
-	        String predicate = pattern.getPredicateVar().getValue().stringValue();
+	    	
+	    	String predicate = pattern.getPredicateVar().getValue().stringValue();
 	        String object = pattern.getObjectVar().getValue().stringValue();
 
-	        // Utilisation de l'ordre POS pour rechercher le sujet
+	        // Utilisation de l'ordre POS pour rechercher les sujets
 	        Set<String> subjects = rdfHandler.findSubjects("POS",predicate, object);
-	        
-	        // Si c'est le premier motif, ajoutez directement à la liste
-            if (listSubjects.isEmpty()) {
-                listSubjects.addAll(subjects);
-            } else {
+	    	
+	    	if(i == 0) { // Si c'est le premier motif
+	    		listSubjects.addAll(subjects);
+	    	}else {
                 // Si ce n'est pas le premier motif, gardez seulement les sujets communs
                 listSubjects.retainAll(subjects);
-            }
+	    	}
+	        i++;
 	    }
 	    return listSubjects;
 	}
@@ -119,7 +129,7 @@ final class Main {
         options.addOption("queries", true, "Chemin vers le dossier des requêtes");
         options.addOption("data", true, "Chemin vers le fichier de données");
         options.addOption("output", true, "Chemin vers le dossier de sortie");
-        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requçetes");
+        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requêtes");
         options.addOption("Jena", false, "Active la vérification Jena");
         options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
         options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
@@ -142,39 +152,68 @@ final class Main {
             boolean shuffle = cmd.hasOption("shuffle") ? true : false;
 
             // Vérifier l'existence des chemins spécifiés
-            if (queriesPath == null || dataPath == null || exportResultsPath == null) {
+            if (queriesPath == null || dataPath == null || outputPath == null) {
                 System.out.println("Les chemins des requêtes, des données et de la sortie sont obligatoires.");
                 return;
             }
             
-            dataFile = dataPath;
-            queryFile = queriesPath;
+            // Utiliser la classe Path pour extraire les noms des fichiers
+            Path queriesPathObject = Paths.get(queriesPath);
+            String queriesFileName = queriesPathObject.getFileName().toString();
+            Path dataPathObject = Paths.get(dataPath);
+            String dataFileName = dataPathObject.getFileName().toString();
+            
+            dataFile += dataPath;
+            queryFile += queriesPath;
             
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
             String csvResultsPath = exportResultsPath + "/results.csv";
-            String csvResultsPath2 = exportResultsPath + "/resultsJena.csv";
+            String csvJenaPath = outputPath + "/resultsJena.csv";
             
             // Créer un FileWriter avec le chemin du fichier CSV spécifié
-            CSVWriter writer = new CSVWriter(new FileWriter(csvResultsPath));
+            CSVWriter writerOutput = new CSVWriter(new FileWriter(csvOutputPath));
+            writerOutput.writeNext(new String[]{"Nom du fichier de données : " + dataFileName});
+            writerOutput.writeNext(new String[]{"Nom du fichier des requêtes : " + queriesFileName});
             
-			//List<String> dataResults = parseData();
-            parseData();
+            timeCurrent = System.currentTimeMillis();
+            List<String> parseResults = parseData();
             List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
-		    writer.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
+            timeTotalEva  = System.currentTimeMillis() - timeCurrent;
+            
+            writerOutput.writeNext(new String[]{"Nombre de tripets RDF : " + parseResults.get(0)});
+            writerOutput.writeNext(new String[]{queryResults.get(0).toString()});
+            writerOutput.writeNext(new String[]{parseResults.get(parseResults.size()-1)});
+            writerOutput.writeNext(new String[]{queryResults.get(queryResults.size()-1).toString()});
+            writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(1) + " ms"});
+            writerOutput.writeNext(new String[]{"Nombre d'indexes : " + parseResults.get(2)});
+            writerOutput.writeNext(new String[]{"Temps total d'évaluation du workload : " + timeTotalEva + " ms"});
+            
+            if(exportResultsPath != null) {
+                CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
+                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
+                for (Set<String> s : queryResults) {
+    		    	writerResults.writeNext(new String[]{s.toString()});
+    		    }
+        		// Fermez le writer des résultats
+                writerResults.close();
+                System.out.println("Resultats du système exportés en CSV: " + csvResultsPath);
+            }	    
 		    
 		    if(useJena) {
 	        	System.out.println("Vérification Jena activée");
 	        	
 		    	List<Set<String>> results = parseQueriesWithJena();
-		    	writer.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
 		    	
-		    	CSVWriter writer2 = new CSVWriter(new FileWriter(csvResultsPath2));
+		    	CSVWriter writerJena = new CSVWriter(new FileWriter(csvJenaPath));
+		    	writerJena.writeNext(new String[]{"Taille se la solution Jena: " + String.valueOf(results.size())});
+		    	
 		    	for (Set<String> s : results) {
-			    	writer2.writeNext(new String[]{s.toString()});
+			    	writerJena.writeNext(new String[]{s.toString()});
 			    }
 	    		// Fermez le writer
-	            writer2.close();
+	            writerJena.close();
+	            System.out.println("Resultats Jena exportés en CSV: " + csvJenaPath);
 	            
 		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
 		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
@@ -192,18 +231,11 @@ final class Main {
 		        }
 		    }
 		    
-		    /*for (String s : dataResults) {
-		    	writer.writeNext(new String[]{s});
-		    }*/
-		    for (Set<String> s : queryResults) {
-		    	writer.writeNext(new String[]{s.toString()});
-		    }
-
-    		// Fermez le writer
-            writer.close();
+		    // Fermez le writer de l'output
+            writerOutput.close();
             
             // Afficher un message indiquant une exportation réussie
-            System.out.println("Resultats exportés en CSV: \n" + csvOutputPath + "\n" + csvResultsPath + "\n" + csvResultsPath2);
+            System.out.println("Resultats de la sortie exportés en CSV: " + csvOutputPath);
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
@@ -214,34 +246,6 @@ final class Main {
         } catch (IOException e) {
             System.err.println("Erreur lors de exportation en CSV: " + e.getMessage());
         }
-		
-		/*System.out.println(parseData());
-		
-		List<Set<String>> resultsPar = parseQueries(100,false);
-        System.out.println("Résultats obtenus avec le système : \n" + resultsPar);
-        System.out.println(resultsPar.size());
-		
-        System.out.println("-------------------------------------------");
-        
-		List<Set<String>> results = parseQueriesWithJena();
-        System.out.println("Résultats obtenus avec Jena : \n" + results);
-        System.out.println(results.size());
-        
-        // Vérifier si les deux listes sont nulles ou ont une taille différente
-        if (results == null || resultsPar == null || results.size() != resultsPar.size()) {
-        	System.out.println("Vérification Jena: incorrecte");
-        } else {
-        	boolean b = true;
-            //int i = 0;
-            // Parcourir les listes et comparer chaque élément
-            for (int i = 0; i < results.size(); i++) {
-                if(!resultsPar.get(i).equals(results.get(i))) {
-                	b = false;
-                	break;
-                }
-            }
-            System.out.println("Correctude et complétude des résultats du système : " + b);
-        }*/
         
 	}
 	
@@ -261,13 +265,16 @@ final class Main {
 	        long queryCount = 0;
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
-	            //resultsParseQueries.add("Le nombre total de requêtes est : " + queryCount);
+	            Set<String> querySet = new HashSet<>();
+	            querySet.add("Nombre de requêtes SPARQL : " + queryCount);
+	            resultsParseQueries.add(querySet);
 	        }
 
 	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
 	        int warmUpCount = (int) (queryCount * (percentage / 100));
 	        //resultsParseQueries.add("Le nombre d'échantillons à exécuter est : " + warmUpCount);
 
+	        timeCurrent = System.currentTimeMillis();
 	        // Deuxième "try" pour traiter la requête
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            SPARQLParser sparqlParser = new SPARQLParser();
@@ -297,6 +304,10 @@ final class Main {
 	                }
 	            }
 	        }
+	        timeReadReq  = System.currentTimeMillis() - timeCurrent;
+	        Set<String> queryTime = new HashSet<>();
+	        queryTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
+	        resultsParseQueries.add(queryTime);
 	    }
 	    return resultsParseQueries;
 	}
@@ -306,7 +317,8 @@ final class Main {
 	 */
 	private static List<String> parseData() throws FileNotFoundException, IOException {
 		List<String> resultsParseData = new ArrayList<>();
-
+		
+		timeCurrent = System.currentTimeMillis();
 		try (Reader dataReader = new FileReader(dataFile)) {
 			RDFParser rdfParser = Rio.createParser(RDFFormat.NTRIPLES);
 
@@ -316,9 +328,18 @@ final class Main {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
+			//Nombre de triplets
+			resultsParseData.add(String.valueOf(rdfHandler.getTripletCount()));
+			//Temps de création du dictionnaire et des indexes
+	        resultsParseData.add(rdfHandler.getDictionaryAndIndexCreationTime());
+	        //Nombre d'index
+	        resultsParseData.add(String.valueOf(rdfHandler.getIndexCount()));
 			resultsParseData.add(rdfHandler.displayDictionary());
 			resultsParseData.add(rdfHandler.displayIndex());
 		}
+		timeReadData  = System.currentTimeMillis() - timeCurrent;
+		resultsParseData.add("Temps de lecture des données : " + timeReadData + " ms");
+		
 		return resultsParseData;
 	}
 	

@@ -11,11 +11,3 @@ SELECT ?v0 WHERE {
 	?v0 <http://purl.org/dc/terms/Location> <http://db.uwaterloo.ca/~galuc/wsdbm/City2> .
 	?v0 <http://schema.org/nationality> <http://db.uwaterloo.ca/~galuc/wsdbm/Country169> .
 	?v0 <http://db.uwaterloo.ca/~galuc/wsdbm/gender> <http://db.uwaterloo.ca/~galuc/wsdbm/Gender1> . }
-	
-SELECT ?v0 WHERE {
-	?v0 <http://db.uwaterloo.ca/~galuc/wsdbm/userId> "8256018" . }
-	
-SELECT ?v0 WHERE {
-	?v0 <http://db.uwaterloo.ca/~galuc/wsdbm/userId> "8256018" .
-	?v0 <http://db.uwaterloo.ca/~galuc/wsdbm/userId> "2351480" . }
-	

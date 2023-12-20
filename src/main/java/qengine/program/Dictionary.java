@@ -10,12 +10,13 @@ import java.util.Set;
 
 public class Dictionary {
 	
+    private long timeDic;
+	
 	//map associant des identifiants uniques à des éléments (String): dictionnaire
     private Map<Integer, String> idToElementMap;
     
     //map avec des clés de type String (représentant l'ordre des éléments dans un triplet)
     //et des valeurs étant des map imbriquées qui représentent un index de triplets
-    //private Map<String, Map<String, Map<String, Integer>>> tripleIndex;
     private Map<String, List<Triple<Integer, Integer, Integer>>> tripleIndex;
     
     private int currentId;
@@ -24,6 +25,9 @@ public class Dictionary {
         this.idToElementMap = new HashMap<>();
         this.tripleIndex = new HashMap<>();
         this.currentId = 0;
+        
+        // Enregistrer le temps de début de la création du dictionnaire et des indexes
+        this.timeDic = System.currentTimeMillis();
     }
 
     //méthode pour ajouter les triplets aux index
@@ -37,6 +41,11 @@ public class Dictionary {
         updateTripleIndex(subjectId, predicateId, objectId);
 
         //System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
+    }
+    
+    public long getDictionaryAndIndexCreationTime() {
+        // Retourner le temps total de création du dictionnaire
+        return System.currentTimeMillis() - timeDic;
     }
 
     private int addElementToDictionary(String element) {
@@ -67,6 +76,10 @@ public class Dictionary {
         tripleIndex
                 .computeIfAbsent(order, k -> new ArrayList<>())
                 .add(new Triple<Integer, Integer, Integer>(first, second, third));
+    }
+    
+    public int getIndexCount() {
+        return tripleIndex.size();
     }
 
     
@@ -106,29 +119,6 @@ public class Dictionary {
 
         return result.toString();    
     }
-    
-    
-    /*public Set<String> findSubjects(String order, String predicate, String object) {
-        // Pour s'assurer de la validité de l'ordre saisi
-        if (!order.equals("POS") && !order.equals("OPS")) {
-            throw new IllegalArgumentException("Order invalide: " + order);
-        }
-        Set<String> results = new HashSet<>();
-        // Obtenir l'id du sujet depuis l'index
-        Map<String, Map<String, Integer>> predicateMap = tripleIndex.get(order);
-        if (predicateMap != null) {
-            Map<String, Integer> objectMap = predicateMap.get(predicate);
-            if (objectMap != null) {
-                Integer subjectId = objectMap.get(object);
-                if (subjectId != null) {
-                    // Retourner le sujet correspondant depuis idToElementMap
-                    results.add(idToElementMap.get(subjectId));
-                }
-                // Sinon, le triplet n'existe pas, ne rien faire
-            }
-        }
-        return results;
-    }*/
     
     public Set<String> findSubjects(String order, String predicate, String object) {
         Set<String> results = new HashSet<>();
