@@ -20,6 +20,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFHandler;
 public final class MainRDFHandler extends AbstractRDFHandler {
 	
 	private final Dictionary rdfDictionary = new Dictionary();
+	private int tripletCount = 0;
 	
 	public void handleStatement(Statement st) {
 		
@@ -28,6 +29,19 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 				st.getPredicate().stringValue(),
 				st.getObject().stringValue()
 		);
+		tripletCount++;
+	}
+	
+	public int getTripletCount() {
+        return tripletCount;
+    }
+	
+	public int getIndexCount() {
+        return rdfDictionary.getIndexCount();
+    }
+	
+	public String getDictionaryAndIndexCreationTime() {
+	    return String.valueOf(rdfDictionary.getDictionaryAndIndexCreationTime());
 	}
 	
 	
