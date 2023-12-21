@@ -126,6 +126,7 @@ final class Main {
 	 * Entrée du programme
 	 */
 	public static void main(String[] args) throws Exception {
+		System.out.println();
 		
 		timeCurrent0 = System.currentTimeMillis();
 		
@@ -290,7 +291,6 @@ final class Main {
 	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
 	        resultsParseQueries.add(readReqTime);
 	        
-
 	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
 	        int warmUpCount = (int) (queryCount * (percentage / 100));
 	        //resultsParseQueries.add("Le nombre d'échantillons à exécuter est : " + warmUpCount);
