@@ -344,7 +344,8 @@ final class Main {
 	 */
 	private static List<String> parseData() throws FileNotFoundException, IOException {
 		List<String> resultsParseData = new ArrayList<>();
-
+		
+		timeCurrent = System.currentTimeMillis();
 		try (Reader dataReader = new FileReader(dataFile)) {
 			RDFParser rdfParser = Rio.createParser(RDFFormat.NTRIPLES);
 
@@ -354,20 +355,19 @@ final class Main {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
-			System.out.println("temps pour lire dictionaire "+ timeDic);
-			
-			timeCurrent = System.currentTimeMillis();
-			
+			//Nombre de triplets
+			resultsParseData.add(String.valueOf(rdfHandler.getTripletCount()));
+			//Temps de création du dictionnaire et des indexes
+	        resultsParseData.add(rdfHandler.getDictionaryAndIndexCreationTime());
+	        //Nombre d'index
+	        resultsParseData.add(String.valueOf(rdfHandler.getIndexCount()));
 			resultsParseData.add(rdfHandler.displayDictionary());
-			
-			timeDic  = System.currentTimeMillis() - timeCurrent;
-			
-			System.out.println("temps pour lire index "+timeIndex);
-			
-			timeCurrent = System.currentTimeMillis();
 			resultsParseData.add(rdfHandler.displayIndex());
-			timeIndex = System.currentTimeMillis() - timeCurrent;
+			
 		}
+		timeReadData  = System.currentTimeMillis() - timeCurrent;
+		resultsParseData.add("Temps de lecture des données : " + timeReadData + " ms");
+		
 		return resultsParseData;
 	}
 	
