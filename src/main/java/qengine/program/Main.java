@@ -61,13 +61,7 @@ import com.opencsv.CSVWriter;
  * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
-	static long timeCurrent = 0;
-	static long timeDic = 0;
-	static long timeIndex = 0;
-	static long timeReadData = 0;
-	static long timeReadReq = 0;
-	static long timeTotalEva = 0;
-	static long timeDebAFin = 0;
+
 	
 	static final String baseURI = null;
 
@@ -80,16 +74,24 @@ final class Main {
 	 * Fichier contenant les requêtes sparql
 	 */
 	//static final String queryFile = workingDir + "sample_query.queryset";
-	static String queryFile = "";
+	static String queryFile = workingDir;
 
 	/**
 	 * Fichier contenant des données rdf
 	 */
 	//static final String dataFile = workingDir + "sample_data.nt";
-	static String dataFile = "";
+	static String dataFile = workingDir;
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
 
+
+	static long timeCurrent;
+	static long timeCurrent0;
+    static long timeReadData;
+    static long timeEvalReq;
+    static long timeTotalEva;
+    static long timeDebAFinProg;
+    static long timeReadReq;
 
 	// ========================================================================
 
@@ -128,15 +130,19 @@ final class Main {
 	 */
 	public static void main(String[] args) throws Exception {
 
-	    // Définir les options de la ligne de commande
-	    Options options = new Options();
-	    options.addOption("queries", true, "Chemin vers le dossier des requêtes");
-	    options.addOption("data", true, "Chemin vers le fichier de données");
-	    options.addOption("output", true, "Chemin vers le dossier de sortie");
-	    options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats de requêttes");
-	    options.addOption("Jena", false, "Active la vérification Jena");
-	    options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
-	    options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
+		
+		timeCurrent0 = System.currentTimeMillis();
+		
+		// Définir les options de la ligne de commande
+        Options options = new Options();
+        options.addOption("queries", true, "Chemin vers le dossier des requêtes");
+        options.addOption("data", true, "Chemin vers le fichier de données");
+        options.addOption("output", true, "Chemin vers le dossier de sortie");
+        options.addOption("export_query_results", true, "Chemin vers le dossier de sortie des résultats des requêtes");
+        options.addOption("Jena", false, "Active la vérification Jena");
+        options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
+        options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
+
 
 	    CommandLineParser parser = new DefaultParser();
 
@@ -168,8 +174,8 @@ final class Main {
             Path dataPathObject = Paths.get(dataPath);
             String dataFileName = dataPathObject.getFileName().toString();
             
-	        dataFile = workingDir+""+dataPath;
-	        queryFile = workingDir+""+queriesPath;
+	        dataFile += dataPath;
+	        queryFile += queriesPath;
             
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
@@ -181,15 +187,27 @@ final class Main {
             writerOutput.writeNext(new String[]{"Nom du fichier de données : " + dataFileName});
             writerOutput.writeNext(new String[]{"Nom du fichier des requêtes : " + queriesFileName});
             
-            parseData();
+            timeCurrent = System.currentTimeMillis();
+            List<String> parseResults = parseData();
             List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
+            timeTotalEva  = System.currentTimeMillis() - timeCurrent;
+            
+            writerOutput.writeNext(new String[]{"Nombre de tripets RDF : " + parseResults.get(0)});
+            writerOutput.writeNext(new String[]{queryResults.get(0).toString()});
+            writerOutput.writeNext(new String[]{parseResults.get(parseResults.size()-1)});
+            writerOutput.writeNext(new String[]{queryResults.get(1).toString()});
+            writerOutput.writeNext(new String[]{queryResults.get(queryResults.size()-1).toString()});
+            writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(1) + " ms"});
+            writerOutput.writeNext(new String[]{"Nombre d'indexes : " + parseResults.get(2)});
+            writerOutput.writeNext(new String[]{"Temps total d'évaluation du workload : " + timeTotalEva + " ms"});
+
             
             if(exportResultsPath != null) {
                 CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
-                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size())});
-                for (Set<String> s : queryResults) {
-    		    	writerResults.writeNext(new String[]{s.toString()});
-    		    }
+                writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size()-3)});
+                for (int i=2; i < queryResults.size()-1; i++) {
+                	writerResults.writeNext(new String[]{queryResults.get(i).toString()});
+                }
         		// Fermez le writer des résultats
                 writerResults.close();
                 System.out.println("Resultats du système exportés en CSV: " + csvResultsPath);
@@ -211,13 +229,13 @@ final class Main {
 	            System.out.println("Resultats Jena exportés en CSV: " + csvJenaPath);
 	            
 		    	// Vérifier si les deux listes sont nulles ou ont une taille différente
-		        if (results == null || queryResults == null || results.size() != queryResults.size()) {
+		        if (results == null || queryResults == null || results.size() != queryResults.size()-3) {
 		        	System.out.println("Correctude et complétude des résultats du système : " + false);
 		        } else {
 		        	boolean b = true;
 		            // Parcourir les listes et comparer chaque élément
 		            for (int i = 0; i < results.size(); i++) {
-		                if(!queryResults.get(i).equals(results.get(i))) {
+		                if(!queryResults.get(i+2).equals(results.get(i)) && i+2 < queryResults.size()) {
 		                	b = false;
 		                	break;
 		                }
@@ -227,6 +245,9 @@ final class Main {
 		    }
 		    
 
+		    timeDebAFinProg  = System.currentTimeMillis() - timeCurrent0;
+		    writerOutput.writeNext(new String[]{"Temps total du début à la fin du programme : " + timeDebAFinProg + " ms"});
+		    
 		    // Fermez le writer de l'output
             writerOutput.close();
 
@@ -262,15 +283,23 @@ final class Main {
 	    } else {
 	        // Premier "try" pour compter le nombre de requêtes
 	        long queryCount = 0;
+	        
+	        timeCurrent = System.currentTimeMillis();
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
 	            //resultsParseQueries.add("Le nombre total de requêtes est : " + queryCount);
 	        }
+	        timeReadReq  = System.currentTimeMillis() - timeCurrent;
+	        Set<String> readReqTime = new HashSet<>();
+	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
+	        resultsParseQueries.add(readReqTime);
+	        
 
 	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
 	        int warmUpCount = (int) (queryCount * (percentage / 100));
 	        //resultsParseQueries.add("Le nombre d'échantillons à exécuter est : " + warmUpCount);
-
+	        
+	        timeCurrent = System.currentTimeMillis();
 	        // Deuxième "try" pour traiter la requête
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            SPARQLParser sparqlParser = new SPARQLParser();
@@ -300,6 +329,12 @@ final class Main {
 	                }
 	            }
 	        }
+	        
+	        timeEvalReq  = System.currentTimeMillis() - timeCurrent;
+	        Set<String> queryTime = new HashSet<>();
+	        queryTime.add("Temps d'évalution des requêtes : " + timeEvalReq + " ms");
+	        resultsParseQueries.add(queryTime);
+
 	    }
 	    return resultsParseQueries;
 	}
@@ -347,7 +382,7 @@ final class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println("Nombre de triplets dans le modèle : " + model.size());
+        //System.out.println("Nombre de triplets dans le modèle : " + model.size());
 
         List<Set<String>> resultList = new ArrayList<>();
         StringBuilder queryString = new StringBuilder();
