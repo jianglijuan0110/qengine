@@ -11,9 +11,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -100,6 +102,9 @@ final class Main {
 	 */
 	public static Set<String> processAQuery(ParsedQuery query) {
 		List<StatementPattern> patterns = StatementPatternCollector.process(query.getTupleExpr());
+		
+		// Nombre de motifs
+	    //System.out.println("Nombre de motifs dans la requête SPARQL : " + patterns.size());
 
 	    // Variables pour collecter les informations nécessaires
 	    Set<String> listSubjects = new HashSet<>(); //Set pour pas qu'il y ait pas de doublons
@@ -188,17 +193,16 @@ final class Main {
             writerOutput.writeNext(new String[]{"Nom du fichier de données : " + dataFileName});
             writerOutput.writeNext(new String[]{"Nom du fichier des requêtes : " + queriesFileName});
             
-            timeCurrent = System.currentTimeMillis();
             List<String> parseResults = parseData();
             List<Set<String>> queryResults = parseQueries(warmPercentage,shuffle);
-            timeTotalEva  = System.currentTimeMillis() - timeCurrent;
             
-            writerOutput.writeNext(new String[]{"Nombre de tripets RDF : " + parseResults.get(0)});
+            writerOutput.writeNext(new String[]{"Nombre de tripets RDF : " + parseResults.get(1)});
             writerOutput.writeNext(new String[]{queryResults.get(0).toString()});
             writerOutput.writeNext(new String[]{parseResults.get(parseResults.size()-1)});
-            writerOutput.writeNext(new String[]{queryResults.get(1).toString()});
             writerOutput.writeNext(new String[]{queryResults.get(queryResults.size()-1).toString()});
-            writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(1) + " ms"});
+            
+            writerOutput.writeNext(new String[]{queryResults.get(queryResults.size()-2).toString()});
+            writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(0) + " ms"});
             writerOutput.writeNext(new String[]{"Nombre d'indexes : " + parseResults.get(2)});
             writerOutput.writeNext(new String[]{"Temps total d'évaluation du workload : " + timeTotalEva + " ms"});
 
@@ -206,7 +210,7 @@ final class Main {
             if(exportResultsPath != null) {
                 CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
                 writerResults.writeNext(new String[]{"Taille se la solution du système: " + String.valueOf(queryResults.size()-3)});
-                for (int i=2; i < queryResults.size()-1; i++) {
+                for (int i=1; i < queryResults.size()-2; i++) {
                 	writerResults.writeNext(new String[]{queryResults.get(i).toString()});
                 }
         		// Fermez le writer des résultats
@@ -215,6 +219,7 @@ final class Main {
             }	    
 		    
 		    if(useJena) {
+		    	System.out.println();
 	        	System.out.println("Vérification Jena activée");
 	        	
 		    	List<Set<String>> results = parseQueriesWithJena();
@@ -236,7 +241,7 @@ final class Main {
 		        	boolean b = true;
 		            // Parcourir les listes et comparer chaque élément
 		            for (int i = 0; i < results.size(); i++) {
-		                if(!queryResults.get(i+2).equals(results.get(i)) && i+2 < queryResults.size()) {
+		                if(!queryResults.get(i+1).equals(results.get(i)) && i+1 < queryResults.size()) {
 		                	b = false;
 		                	break;
 		                }
@@ -267,9 +272,6 @@ final class Main {
         }
 
 }
-
-
-	       
 	// ========================================================================
 
 	/**
@@ -278,6 +280,8 @@ final class Main {
 	private static List<Set<String>> parseQueries(double percentage, boolean shuffle) throws FileNotFoundException, IOException {
 		List<Set<String>> resultsParseQueries = new ArrayList<>();
 
+		long endTimeEvaluation = 0;
+		
 	    // Vérifier que warmPercentage est dans la plage valide
 	    if (percentage <= 0 || percentage > 100) {
 	        System.out.println("Le pourcentage doit être compris entre 0 et 100.");
@@ -290,30 +294,62 @@ final class Main {
 	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
 	            //resultsParseQueries.add("Le nombre total de requêtes est : " + queryCount);
 	        }
-	        timeReadReq  = System.currentTimeMillis() - timeCurrent;
+	        /*timeReadReq  = System.currentTimeMillis() - timeCurrent;
 	        Set<String> readReqTime = new HashSet<>();
 	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
-	        resultsParseQueries.add(readReqTime);
+	        resultsParseQueries.add(readReqTime);*/
 	        
 	        // Calculer le nombre d'échantillons à exécuter (partie entière inférieure)
 	        int warmUpCount = (int) (queryCount * (percentage / 100));
 	        //resultsParseQueries.add("Le nombre d'échantillons à exécuter est : " + warmUpCount);
-	        
-	        timeCurrent = System.currentTimeMillis();
+
+	        //timeCurrent = System.currentTimeMillis();
 	        // Deuxième "try" pour traiter la requête
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            SPARQLParser sparqlParser = new SPARQLParser();
 	            Iterator<String> lineIterator = lineStream.iterator();
 	            StringBuilder queryString = new StringBuilder();
+	            
+	            // Pour compter le nombre de requêtes par nombre de motifs
+	            //Map<Integer, Integer> queryCountByPatternCount = new HashMap<>();
+	            
+	            // Utiliser un Set pour stocker les requêtes déjà rencontrées
+	            /*Set<String> uniqueQueries = new HashSet<>();
+	            Map<String, Integer> queryCountMap = new HashMap<>();*/
 
 	            int processedCount = 0; // Compte le nombre de requêtes traitées
 	            while (lineIterator.hasNext() && processedCount < warmUpCount) {
 	                String line = lineIterator.next();
 	                queryString.append(line);
 
+	                // Mesurer le temps d'évaluation de la requête
+            		timeCurrent0 = System.currentTimeMillis();
 	                if (line.trim().endsWith("}")) {
 	                    ParsedQuery query = sparqlParser.parseQuery(queryString.toString(), baseURI);
+	                    
+	                    // Pour compter le nombre de motifs dans la requête
+	                    /*int patternCount = StatementPatternCollector.process(query.getTupleExpr()).size();
+	                    // Pour compter le nombre de requêtes par nombre de motifs
+	                    if (queryCountByPatternCount.containsKey(patternCount)) {
+	                        queryCountByPatternCount.put(patternCount, queryCountByPatternCount.get(patternCount) + 1);
+	                    } else {
+	                        queryCountByPatternCount.put(patternCount, 1);
+	                    }*/
+	                    
+	                    // Ajouter cette ligne pour obtenir la représentation textuelle de la requête
+	                    /*String queryStringText = queryString.toString();
 
+	                    // Ajouter cette partie pour compter les doublons
+	                    if (!uniqueQueries.contains(queryStringText)) {
+	                        uniqueQueries.add(queryStringText);
+	                    } else {
+	                        if (queryCountMap.containsKey(queryStringText)) {
+	                            queryCountMap.put(queryStringText, queryCountMap.get(queryStringText) + 1);
+	                        } else {
+	                            queryCountMap.put(queryStringText, 2); // La première occurrence compte comme 1
+	                        }
+	                    }*/
+                		
 	                    // Générer un nombre aléatoire entre 0 et 1
 	                    double randomIndex = Math.random();
 
@@ -327,15 +363,35 @@ final class Main {
 	                    }
 	                    queryString.setLength(0); // Reset le buffer de la requête en chaine vide
 	                }
+	                endTimeEvaluation += System.currentTimeMillis() - timeCurrent0;
 	            }
+	            
+	            /*for (Map.Entry<Integer, Integer> entry : queryCountByPatternCount.entrySet()) {
+	            	System.out.println("Nombre de requêtes avec " + entry.getKey() + " motifs : " + entry.getValue());
+	            }*/
+	            
+	            // Ajouter cette partie pour afficher les doublons
+	            /*for (Map.Entry<String, Integer> entry : queryCountMap.entrySet()) {
+	            	System.out.println("Requête : " + entry.getKey() + " | Nombre d'occurrences : " + entry.getValue());
+	            }*/
 	        }
-	        
-	        timeEvalReq  = System.currentTimeMillis() - timeCurrent;
-	        Set<String> queryTime = new HashSet<>();
-	        queryTime.add("Temps d'évalution des requêtes : " + timeEvalReq + " ms");
-	        resultsParseQueries.add(queryTime);
 
+	        //timeEvalReq  = System.currentTimeMillis() - timeCurrent;
+	        Set<String> queryTime = new HashSet<>();
+	        //queryTime.add("Temps d'évalution des requêtes : " + timeEvalReq + " ms");
+	        queryTime.add("Temps d'évalution des requêtes : " + endTimeEvaluation + " ms");
+	        resultsParseQueries.add(queryTime);
+      
+	        timeReadReq  = System.currentTimeMillis() - timeCurrent - endTimeEvaluation;
+	        Set<String> readReqTime = new HashSet<>();
+	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
+	        resultsParseQueries.add(readReqTime);
+	        
+	        System.out.println("Temps de lecture et d'évaluation des requêtes : " 
+		    		+ (System.currentTimeMillis() - timeCurrent));
+	        timeTotalEva  += System.currentTimeMillis() - timeCurrent;
 	    }
+	    
 	    return resultsParseQueries;
 	}
 
@@ -344,6 +400,8 @@ final class Main {
 	 */
 	private static List<String> parseData() throws FileNotFoundException, IOException {
 		List<String> resultsParseData = new ArrayList<>();
+		
+		long timeCreationDicAndIndex;
 		
 		timeCurrent = System.currentTimeMillis();
 		try (Reader dataReader = new FileReader(dataFile)) {
@@ -355,18 +413,23 @@ final class Main {
 			// Parsing and processing each triple by the handler
 			rdfParser.parse(dataReader, baseURI);
 			
+			//Temps de création du dictionnaire et des indexes
+			timeCreationDicAndIndex = rdfHandler.getDictionaryAndIndexCreationTime();
+	        resultsParseData.add(String.valueOf(timeCreationDicAndIndex));
 			//Nombre de triplets
 			resultsParseData.add(String.valueOf(rdfHandler.getTripletCount()));
-			//Temps de création du dictionnaire et des indexes
-	        resultsParseData.add(rdfHandler.getDictionaryAndIndexCreationTime());
 	        //Nombre d'index
 	        resultsParseData.add(String.valueOf(rdfHandler.getIndexCount()));
 			resultsParseData.add(rdfHandler.displayDictionary());
 			resultsParseData.add(rdfHandler.displayIndex());
 			
 		}
-		timeReadData  = System.currentTimeMillis() - timeCurrent;
+		timeReadData  = System.currentTimeMillis() - timeCurrent - timeCreationDicAndIndex;
 		resultsParseData.add("Temps de lecture des données : " + timeReadData + " ms");
+		
+		System.out.println("Temps de lecture des données et de création du dictionaire et indexes : " 
+		+ (System.currentTimeMillis() - timeCurrent));
+		timeTotalEva  += System.currentTimeMillis() - timeCurrent;
 		
 		return resultsParseData;
 	}
@@ -375,6 +438,13 @@ final class Main {
 	 * Vérification Jena
 	 */
 	public static List<Set<String>> parseQueriesWithJena() throws FileNotFoundException, IOException {
+		System.out.println("Evaluation des temps obtenus avec Jena : ");
+		
+		// Mesurer le temps total d'évaluation du workload
+        timeCurrent = System.currentTimeMillis();
+        
+		// Mesurer le temps de lecture des données RDF avec Jena
+		timeCurrent0 = System.currentTimeMillis();
         // Chargement des données RDF avec Jena
         Model model = ModelFactory.createDefaultModel();
         try (FileInputStream in = new FileInputStream(dataFile)) {
@@ -383,13 +453,19 @@ final class Main {
             e.printStackTrace();
         }
         //System.out.println("Nombre de triplets dans le modèle : " + model.size());
+        timeReadData = System.currentTimeMillis()-timeCurrent0;
+        System.out.println("- Temps de lecture des données : " + timeReadData+ " ms");
 
         List<Set<String>> resultList = new ArrayList<>();
         StringBuilder queryString = new StringBuilder();
-
+        
         try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
             Iterator<String> lineIterator = lineStream.iterator();
 
+            // Mesurer le temps d'évaluation et de lecture des requêtes SPARQL
+            long startTimeLecture = System.currentTimeMillis();
+            long endTimeEvaluation = 0;
+            
             while (lineIterator.hasNext()) {
                 String line = lineIterator.next();
                 queryString.append(line);
@@ -402,6 +478,8 @@ final class Main {
                         // Création de l'objet Query à partir de la chaîne SPARQL
                         Query query = QueryFactory.create(sparqlQuery);
 
+                        // Mesurer le temps d'évaluation de la requête
+                		timeCurrent0 = System.currentTimeMillis();
                         // Création et exécution de la requête SPARQL avec Jena
                         try (QueryExecution qexec = QueryExecutionFactory.create(query, model)) {
                             ResultSet results = qexec.execSelect();
@@ -421,6 +499,8 @@ final class Main {
                             // Ajouter la liste de résultats de la requête courante à la liste résultante
                             resultList.add(queryResultList);
                         }
+                        endTimeEvaluation += System.currentTimeMillis() - timeCurrent0;
+                        
                     } catch (Exception e) {
                         e.printStackTrace();
                         // Gérer les erreurs liées à la création ou l'exécution de la requête SPARQL
@@ -432,10 +512,20 @@ final class Main {
                     queryString.setLength(0);
                 }
             }
+            
+            System.out.println("- Temps total d'évaluation des requêtes : " + endTimeEvaluation + " ms");
+            
+            long timeReadReq = System.currentTimeMillis() - startTimeLecture - endTimeEvaluation;
+            System.out.println("- Temps de lecture des requêtes : " + timeReadReq + " ms");
+            
         } catch (IOException e) {
             e.printStackTrace();
             // Gérer les erreurs liées à la lecture du fichier de requêtes
         }
+        
+        long endTimeWorkload  = System.currentTimeMillis() - timeCurrent;
+        System.out.println("- Temps total d'évaluation du workload : " + endTimeWorkload + " ms");
+        System.out.println();
 
         return resultList;
     }
