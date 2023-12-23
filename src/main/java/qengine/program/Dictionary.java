@@ -10,7 +10,9 @@ import java.util.Set;
 
 public class Dictionary {
 	
-    private long timeDicAndIndex;
+	private long startTime;
+	
+    //private long timeDicAndIndex;
 	
 	//map associant des identifiants uniques à des éléments (String): dictionnaire
     private Map<Integer, String> idToElementMap;
@@ -27,11 +29,16 @@ public class Dictionary {
         this.currentId = 0;
         
         // Enregistrer le temps de début de la création du dictionnaire et des indexes
-        this.timeDicAndIndex = System.currentTimeMillis();
+        //this.timeDicAndIndex = System.currentTimeMillis();
     }
 
     //méthode pour ajouter les triplets aux index
     public void addTriple(String subject, String predicate, String object) {
+    	// Si c'est le premier ajout
+    	if (this.idToElementMap.size() == 0) {
+            this.startTime = System.currentTimeMillis();
+        }
+    	
         // Ajoute le sujet, prédicat et objet au dictionnaire et les attribue des identifiants uniques
         int subjectId = addElementToDictionary(subject);
         int predicateId = addElementToDictionary(predicate);
@@ -43,10 +50,14 @@ public class Dictionary {
         //System.out.println("Triple added: (" + subjectId + ", " + predicateId + ", " + objectId + ")");
     }
     
-    public long getDictionaryAndIndexCreationTime() {
+    public long getStartTime() {
+        return this.startTime;
+    }
+    
+    /*public long getDictionaryAndIndexCreationTime() {
         // Retourner le temps total de création du dictionnaire
         return System.currentTimeMillis() - timeDicAndIndex;
-    }
+    }*/
 
     private int addElementToDictionary(String element) {
         // Vérifie si l'élément existe déjà dans la map

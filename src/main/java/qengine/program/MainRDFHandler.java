@@ -21,14 +21,15 @@ public final class MainRDFHandler extends AbstractRDFHandler {
 	
 	private final Dictionary rdfDictionary = new Dictionary();
 	private int tripletCount = 0;
+	private long timeFinAjout;
 	
 	public void handleStatement(Statement st) {
-		
 		rdfDictionary.addTriple(
 				st.getSubject().stringValue(),
 				st.getPredicate().stringValue(),
 				st.getObject().stringValue()
 		);
+		timeFinAjout = System.currentTimeMillis();
 		tripletCount++;
 	}
 	
@@ -40,8 +41,9 @@ public final class MainRDFHandler extends AbstractRDFHandler {
         return rdfDictionary.getIndexCount();
     }
 	
-	public String getDictionaryAndIndexCreationTime() {
-	    return String.valueOf(rdfDictionary.getDictionaryAndIndexCreationTime());
+	public long getDictionaryAndIndexCreationTime() {
+	    //return rdfDictionary.getDictionaryAndIndexCreationTime();
+		return this.timeFinAjout - rdfDictionary.getStartTime();
 	}
 	
 	
