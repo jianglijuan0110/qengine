@@ -63,6 +63,7 @@ import com.opencsv.CSVWriter;
  * et Lijuan Jiang <olivier.rodriguez1@umontpellier.fr>
  */
 final class Main {
+
 	
 	static final String baseURI = null;
 
@@ -85,6 +86,7 @@ final class Main {
 	
 	private static final MainRDFHandler rdfHandler = new MainRDFHandler();
 
+
 	static long timeCurrent;
 	static long timeCurrent0;
     static long timeReadData;
@@ -92,6 +94,7 @@ final class Main {
     static long timeTotalEva;
     static long timeDebAFinProg;
     static long timeReadReq;
+
 	// ========================================================================
 
 	/**
@@ -131,6 +134,7 @@ final class Main {
 	 * Entrée du programme
 	 */
 	public static void main(String[] args) throws Exception {
+
 		System.out.println();
 		
 		timeCurrent0 = System.currentTimeMillis();
@@ -144,6 +148,7 @@ final class Main {
         options.addOption("Jena", false, "Active la vérification Jena");
         options.addOption("warm", true, "Pourcentage d'échantillon pour le chauffage du système");
         options.addOption("shuffle", false, "Permutation aléatoire des requêtes");
+
 
 	    CommandLineParser parser = new DefaultParser();
 
@@ -174,9 +179,9 @@ final class Main {
             String queriesFileName = queriesPathObject.getFileName().toString();
             Path dataPathObject = Paths.get(dataPath);
             String dataFileName = dataPathObject.getFileName().toString();
-
-            dataFile += dataPath;
-            queryFile += queriesPath;
+            
+	        dataFile += dataPath;
+	        queryFile += queriesPath;
             
             // Spécifiez le chemin du fichier CSV
             String csvOutputPath = outputPath + "/output.csv";
@@ -200,6 +205,7 @@ final class Main {
             writerOutput.writeNext(new String[]{"Temps de création du dictionnaire et des indexes : " + parseResults.get(0) + " ms"});
             writerOutput.writeNext(new String[]{"Nombre d'indexes : " + parseResults.get(2)});
             writerOutput.writeNext(new String[]{"Temps total d'évaluation du workload : " + timeTotalEva + " ms"});
+
             
             if(exportResultsPath != null) {
                 CSVWriter writerResults = new CSVWriter(new FileWriter(csvResultsPath));
@@ -253,7 +259,7 @@ final class Main {
 
             
             // Afficher un message indiquant une exportation réussie
-            System.out.println("Resultats de la sortie exportés en CSV: " + csvOutputPath);
+            System.out.println("Resultats exportés en CSV: " + csvOutputPath);
         } catch (ParseException e) {
             // Gestion des erreurs d'analyse des arguments
             e.printStackTrace();
@@ -286,9 +292,7 @@ final class Main {
 	        timeCurrent = System.currentTimeMillis();
 	        try (Stream<String> lineStream = Files.lines(Paths.get(queryFile))) {
 	            queryCount = lineStream.filter(line -> line.trim().endsWith("}")).count();
-	            Set<String> querySet = new HashSet<>();
-	            querySet.add("Nombre de requêtes SPARQL : " + queryCount);
-	            resultsParseQueries.add(querySet);
+	            //resultsParseQueries.add("Le nombre total de requêtes est : " + queryCount);
 	        }
 	        /*timeReadReq  = System.currentTimeMillis() - timeCurrent;
 	        Set<String> readReqTime = new HashSet<>();
@@ -371,12 +375,13 @@ final class Main {
 	            	System.out.println("Requête : " + entry.getKey() + " | Nombre d'occurrences : " + entry.getValue());
 	            }*/
 	        }
+
 	        //timeEvalReq  = System.currentTimeMillis() - timeCurrent;
 	        Set<String> queryTime = new HashSet<>();
 	        //queryTime.add("Temps d'évalution des requêtes : " + timeEvalReq + " ms");
 	        queryTime.add("Temps d'évalution des requêtes : " + endTimeEvaluation + " ms");
 	        resultsParseQueries.add(queryTime);
-	        
+      
 	        timeReadReq  = System.currentTimeMillis() - timeCurrent - endTimeEvaluation;
 	        Set<String> readReqTime = new HashSet<>();
 	        readReqTime.add("Temps de lecture des requêtes : " + timeReadReq + " ms");
@@ -385,7 +390,6 @@ final class Main {
 	        System.out.println("Temps de lecture et d'évaluation des requêtes : " 
 		    		+ (System.currentTimeMillis() - timeCurrent));
 	        timeTotalEva  += System.currentTimeMillis() - timeCurrent;
-	        
 	    }
 	    
 	    return resultsParseQueries;
@@ -418,6 +422,7 @@ final class Main {
 	        resultsParseData.add(String.valueOf(rdfHandler.getIndexCount()));
 			resultsParseData.add(rdfHandler.displayDictionary());
 			resultsParseData.add(rdfHandler.displayIndex());
+			
 		}
 		timeReadData  = System.currentTimeMillis() - timeCurrent - timeCreationDicAndIndex;
 		resultsParseData.add("Temps de lecture des données : " + timeReadData + " ms");
